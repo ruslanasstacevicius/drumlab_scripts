@@ -1,5 +1,5 @@
 {***********************************************
-Drum Lab
+Drum Lab 1.2
 Options Page
 Author: Native Instruments
 Written by: Thanos Kazakos
@@ -9,6 +9,7 @@ Modified: June 11th, 2014
 on init
 {general variables & Constants}
 	message("")
+	declare $init_LOADED := 1
 	
 	make_perfview
 	{set_control_par_str($INST_WALLPAPER_ID,$CONTROL_PAR_PICTURE,"bg_HYBRID_drummer")}
@@ -33,7 +34,7 @@ on init
 	declare const $GROUP_NUM := 372
 
 	declare const $MIDI_PTTRN_LOW	:= 12
-	declare const $MIDI_PTTRN_HIGH	:= 23
+	declare const $MIDI_PTTRN_HIGH	:= 24
 	declare const $IS_KEYSWITCH		:= 12
 	set_keyrange($MIDI_PTTRN_LOW, $MIDI_PTTRN_HIGH, "Groove Pattern Select")
 
@@ -676,6 +677,20 @@ on init
 	make_persistent(%min_velocity_key)
 	make_persistent(%max_velocity_key)
 	{/Declarations}
+
+	{snapshot isolation}
+	make_instr_persistent($min_velocity_sld)
+	make_instr_persistent($max_velocity_sld)
+	make_instr_persistent($linear_velocity_btn)
+	make_instr_persistent($exp_1_velocity_btn)
+	make_instr_persistent($exp_2_velocity_btn)
+	make_instr_persistent($fix_velocity_btn)
+	make_instr_persistent($min_vel_up_btn)
+	make_instr_persistent($max_vel_up_btn)
+	make_instr_persistent($min_vel_dn_btn)
+	make_instr_persistent($max_vel_dn_btn)
+	make_instr_persistent(%min_velocity_key)
+	make_instr_persistent(%max_velocity_key)
 	
 	{ui_ids}
 	declare %velocity_id[10]
@@ -809,6 +824,8 @@ on init
 
 	declare %mode_velocity_key[128]
 	make_persistent(%mode_velocity_key)
+
+	make_instr_persistent(%mode_velocity_key)
 	
 	declare const $EXP_SHAPE := 20
 	
@@ -841,6 +858,9 @@ on init
 	
 	make_persistent (%table)
 	make_persistent ($curve)
+
+	make_instr_persistent(%table)
+	make_instr_persistent($curve)
 	
 	declare %shape_form[128]
 	declare %curve_form[128]
@@ -911,9 +931,9 @@ on init
 		%FACTORY_MAPPING[$count_1 * 128 + 36] := 1 		{kick}
 		%FACTORY_MAPPING[$count_1 * 128 + 37] := 0 		{kick}
 		%FACTORY_MAPPING[$count_1 * 128 + 38] := 4 		{snare center}
-		%FACTORY_MAPPING[$count_1 * 128 + 39] := 11 	{snare rimshot}
+		%FACTORY_MAPPING[$count_1 * 128 + 39] := 11 	{snare sidestick}
 		%FACTORY_MAPPING[$count_1 * 128 + 40] := 7 		{snare halway}
-		%FACTORY_MAPPING[$count_1 * 128 + 41] := 10 	{TOM 3}
+		%FACTORY_MAPPING[$count_1 * 128 + 41] := 10 	{snare rimshot}
 		%FACTORY_MAPPING[$count_1 * 128 + 42] := 23 	{hihat}
 		%FACTORY_MAPPING[$count_1 * 128 + 43] := 54 	{TOM 3}
 		%FACTORY_MAPPING[$count_1 * 128 + 44] := 29 	{hihat}
@@ -2466,6 +2486,11 @@ on init
 	declare ui_text_edit @current_preset_name
 	{/Declarations}
 
+	make_instr_persistent($current_mapping_preset_mnu)
+	make_instr_persistent($instruments_mnu)
+	make_instr_persistent($articulations_mnu)
+	make_instr_persistent($active_key_sld)
+
 	{ui_ids}
 	declare %mapping_id[14]
 	%mapping_id[0] := get_ui_id($current_mapping_preset_mnu)
@@ -2649,7 +2674,7 @@ on init
 	$load_user_mapping_names_id	:= load_array(!DL_user_mapping_names, 1)
 	
 	read_persistent_var($current_mapping_preset_mnu)
-	
+		
 	$count_1 := 0
 	if (%DL_num_user_presets[0] > 0)
 		while ($count_1 < %DL_num_user_presets[0])
@@ -2682,9 +2707,10 @@ on init
 	$active_key_sld := 36
 	{%mode_velocity_key[$active_key_sld]}
 	
-	make_persistent(%current_mapping_data)
-	read_persistent_var(%current_mapping_data)
-	
+	{make_persistent(%current_mapping_data)}
+	{read_persistent_var(%current_mapping_data)}
+	make_instr_persistent(%current_mapping_data)
+
 	$count_1 := 0
 	while ($count_1 < 128)
 		if (%current_mapping_data[$count_1] > -1)
@@ -2692,13 +2718,17 @@ on init
 		end if
 		inc($count_1)
 	end while
+
+	{make_instr_persistent(%inverse_mapping_data)}
 	
 	pgs_create_key(MAPPING, 128)
+	pgs_create_key(CUR_MAPPING, 128)
 	
 	pgs_set_key_val(COMMAND, 0, -1)
 	$count_1 := 0
 	while ($count_1 < 128)
-		pgs_set_key_val(MAPPING, $count_1, %inverse_mapping_data[$count_1])
+		pgs_set_key_val(MAPPING, 	 $count_1, %inverse_mapping_data[$count_1])
+		pgs_set_key_val(CUR_MAPPING, $count_1, %current_mapping_data[$count_1])
 		inc($count_1)
 	end while
 	pgs_set_key_val(COMMAND, 0, 6)
@@ -2797,6 +2827,9 @@ on init
 				set_menu_item_str(%mapping_id[2],1, !PERC_B_ARTIC_NAMES[pgs_get_key_val(ACTIVE_PERC5, 0) * 2 + 1])
 		end select
 	end if
+
+	make_instr_persistent($instruments_mnu)
+	make_instr_persistent($articulations_mnu)
 	
 	while ($count_1 < 20)
 		set_menu_item_visibility(%mapping_id[2], $count_1, 0)
@@ -3192,11 +3225,14 @@ on init
 	declare ui_button $load_ALL
 	declare ui_button $purge_UNUSED
 
-	make_persistent($load_ALL)
-	make_persistent($purge_UNUSED)
-	read_persistent_var($load_ALL)
-	read_persistent_var($purge_UNUSED)
+	{make_persistent($load_ALL)
+	make_persistent($purge_UNUSED)}
+	{read_persistent_var($load_ALL)
+	read_persistent_var($purge_UNUSED)}
 
+	make_instr_persistent($load_ALL)
+	make_instr_persistent($purge_UNUSED)
+	
 	pgs_create_key(PURGE_MODE, 1)
 	pgs_set_key_val(PURGE_MODE, 0, $purge_UNUSED)	
 
@@ -3849,7 +3885,7 @@ on init
 				{PRESET 10}...
 				0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0)
 
-set_listener($NI_SIGNAL_TIMER_MS,100)
+{set_listener($NI_SIGNAL_TIMER_MS,100)}
 $init_flag := 0
 set_key_pressed_support(1)
 end on
@@ -4030,7 +4066,9 @@ end on
 						set_key_color($count_1, $KEY_COLOR_ORANGE)
 				end select
 				$instruments_mnu := %which_key_to_which_inst[%current_mapping_data[$count_1]]
+				
 				set_key_name($count_1, !inst_visual_names[$instruments_mnu] & " " & !artic_visual_name[%FACTORY_MAPPING[$current_mapping_preset_mnu * 128 + $count_1]])
+				message("")
 			else
 				set_key_color($count_1, $KEY_COLOR_INACTIVE)
 				set_key_name($count_1, "")
@@ -5241,6 +5279,7 @@ end on
 			purge_group($group_count, 1)
 			inc($group_count)
 		end while
+		message("Load ALL: " & $load_ALL & " | Purge Unsused: " & $purge_UNUSED & " | " &   pgs_get_key_val(PURGE_MODE, 0))
 	end on
 
 	on ui_control ($purge_UNUSED)
@@ -5254,9 +5293,10 @@ end on
 	    end while
     	$group_count := 0
         while ($group_count < $EL_NUM_GROUPS)
-            purge_group($group_count + $AC_NUM_GROUPS, %Ac_Group_PURGE_State[$group_count])
+            purge_group($group_count + $AC_NUM_GROUPS, %El_Group_PURGE_State[$group_count])
             inc($group_count)
         end while
+        message("Load ALL: " & $load_ALL & " | Purge Unsused: " & $purge_UNUSED & " | " &   pgs_get_key_val(PURGE_MODE, 0))
 	end on
 
 {SOUND PRESETS - CALLBACKS / FUNCTIONS}
@@ -5294,16 +5334,20 @@ end on
 			pgs_set_key_val(PRESET_DATA, 4, 0)
 			pgs_set_key_val(COMMAND, 0, 1)
 
+			message(pgs_get_key_val(PURGE_MODE, 0))
+
 			if (pgs_key_exists(PURGE_MODE))	
 				if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
 	    			$group_count := 0
 	    		    while ($group_count < $AC_NUM_GROUPS)
 	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 	    		        inc($group_count)
 	    		    end while
 			    	$group_count := 0
 			        while ($group_count < $EL_NUM_GROUPS)
 			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 			            inc($group_count)
 			        end while
 	    		end if
@@ -5324,11 +5368,13 @@ end on
 	    			$group_count := 0
 	    		    while ($group_count < $AC_NUM_GROUPS)
 	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 	    		        inc($group_count)
 	    		    end while
 			    	$group_count := 0
 			        while ($group_count < $EL_NUM_GROUPS)
 			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 			            inc($group_count)
 			        end while
 	    		end if
@@ -5349,11 +5395,13 @@ end on
 	    			$group_count := 0
 	    		    while ($group_count < $AC_NUM_GROUPS)
 	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 	    		        inc($group_count)
 	    		    end while
 			    	$group_count := 0
 			        while ($group_count < $EL_NUM_GROUPS)
 			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 			            inc($group_count)
 			        end while
 	    		end if
@@ -5374,11 +5422,13 @@ end on
 	    			$group_count := 0
 	    		    while ($group_count < $AC_NUM_GROUPS)
 	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 	    		        inc($group_count)
 	    		    end while
 			    	$group_count := 0
 			        while ($group_count < $EL_NUM_GROUPS)
 			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 			            inc($group_count)
 			        end while
 	    		end if
@@ -5399,11 +5449,13 @@ end on
 	    			$group_count := 0
 	    		    while ($group_count < $AC_NUM_GROUPS)
 	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 	    		        inc($group_count)
 	    		    end while
 			    	$group_count := 0
 			        while ($group_count < $EL_NUM_GROUPS)
 			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 			            inc($group_count)
 			        end while
 	    		end if
@@ -5424,11 +5476,13 @@ end on
 	    			$group_count := 0
 	    		    while ($group_count < $AC_NUM_GROUPS)
 	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 	    		        inc($group_count)
 	    		    end while
 			    	$group_count := 0
 			        while ($group_count < $EL_NUM_GROUPS)
 			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 			            inc($group_count)
 			        end while
 	    		end if
@@ -5450,11 +5504,13 @@ end on
 	    			$group_count := 0
 	    		    while ($group_count < $AC_NUM_GROUPS)
 	    		        purge_group($group_count, %user_snd_preset_Ac_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $AC_NUM_GROUPS + $group_count])
+	    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 	    		        inc($group_count)
 	    		    end while
 			    	$group_count := 0
 			        while ($group_count < $EL_NUM_GROUPS)
 			            purge_group($group_count + $AC_NUM_GROUPS, %user_snd_preset_El_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $EL_NUM_GROUPS + $group_count])
+			            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 			            inc($group_count)
 			        end while
 	    		end if
@@ -5476,11 +5532,13 @@ end on
 	    			$group_count := 0
 	    		    while ($group_count < $AC_NUM_GROUPS)
 	    		        purge_group($group_count, %user_snd_preset_Ac_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $AC_NUM_GROUPS + $group_count])
+	    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 	    		        inc($group_count)
 	    		    end while
 			    	$group_count := 0
 			        while ($group_count < $EL_NUM_GROUPS)
 			            purge_group($group_count + $AC_NUM_GROUPS, %user_snd_preset_El_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $EL_NUM_GROUPS + $group_count])
+			            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 			            inc($group_count)
 			        end while
 	    		end if
@@ -5604,11 +5662,13 @@ end on
 		    			$group_count := 0
 		    		    while ($group_count < $AC_NUM_GROUPS)
 		    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+		    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 		    		        inc($group_count)
 		    		    end while
 				    	$group_count := 0
 				        while ($group_count < $EL_NUM_GROUPS)
 				            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+				            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 				            inc($group_count)
 				        end while
 		    		end if
@@ -5619,11 +5679,13 @@ end on
 		    			$group_count := 0
 		    		    while ($group_count < $AC_NUM_GROUPS)
 		    		        purge_group($group_count, %user_snd_preset_Ac_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $AC_NUM_GROUPS + $group_count])
+		    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 		    		        inc($group_count)
 		    		    end while
 				    	$group_count := 0
 				        while ($group_count < $EL_NUM_GROUPS)
 				            purge_group($group_count + $AC_NUM_GROUPS, %user_snd_preset_El_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $EL_NUM_GROUPS + $group_count])
+				            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 				            inc($group_count)
 				        end while
 		    		end if
@@ -5749,11 +5811,13 @@ end on
 		    			$group_count := 0
 		    		    while ($group_count < $AC_NUM_GROUPS)
 		    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+		    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 		    		        inc($group_count)
 		    		    end while
 				    	$group_count := 0
 				        while ($group_count < $EL_NUM_GROUPS)
 				            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+				            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 				            inc($group_count)
 				        end while
 		    		end if
@@ -5764,11 +5828,13 @@ end on
 		    			$group_count := 0
 		    		    while ($group_count < $AC_NUM_GROUPS)
 		    		        purge_group($group_count, %user_snd_preset_Ac_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $AC_NUM_GROUPS + $group_count])
+		    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 		    		        inc($group_count)
 		    		    end while
 				    	$group_count := 0
 				        while ($group_count < $EL_NUM_GROUPS)
 				            purge_group($group_count + $AC_NUM_GROUPS, %user_snd_preset_El_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $EL_NUM_GROUPS + $group_count])
+				            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 				            inc($group_count)
 				        end while
 		    		end if
@@ -5810,11 +5876,13 @@ end on
 		    			$group_count := 0
 		    		    while ($group_count < $AC_NUM_GROUPS)
 		    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+		    		        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 		    		        inc($group_count)
 		    		    end while
 				    	$group_count := 0
 				        while ($group_count < $EL_NUM_GROUPS)
 				            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+				            %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 				            inc($group_count)
 				        end while
 		    		end if
@@ -5826,11 +5894,13 @@ end on
 		    				$group_count := 0
 		    			    while ($group_count < $AC_NUM_GROUPS)
 		    			        purge_group($group_count, %user_snd_preset_Ac_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $AC_NUM_GROUPS + $group_count])
+		    			        %Ac_Group_PURGE_State[$group_count] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $group_count)
 		    			        inc($group_count)
 		    			    end while
 				    		$group_count := 0
 				    	    while ($group_count < $EL_NUM_GROUPS)
 				    	        purge_group($group_count + $AC_NUM_GROUPS, %user_snd_preset_El_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $EL_NUM_GROUPS + $group_count])
+				    	        %El_Group_PURGE_State[$group_count] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $group_count)
 				    	        inc($group_count)
 				    	    end while
 						end if
@@ -5860,14 +5930,21 @@ on poly_at
 	end if	
 end on
 
-on listener
+{on listener
 	select ($NI_SIGNAL_TYPE)
 		case $NI_SIGNAL_TIMER_MS
 			call key_coloring
 			call update_sound_preset_menu
+			pgs_set_key_val(COMMAND, 0, -1)
+			$count_1 := 0
+			while ($count_1 < 128)
+				pgs_set_key_val(MAPPING, $count_1, %inverse_mapping_data[$count_1])
+				inc($count_1)
+			end while
+			pgs_set_key_val(COMMAND, 0, 6)
 			change_listener_par($NI_SIGNAL_TIMER_MS,0)
 	end select
-end on
+end on}
 
 on async_complete
 	if ($NI_ASYNC_ID = $save_user_mapping_data_id)
@@ -5953,13 +6030,9 @@ end on
 
 on note
 	$cur_note := $EVENT_NOTE
-
+	{message(%current_mapping_data[$EVENT_NOTE] & " | " & $EVENT_NOTE)}
 	$played_key := $EVENT_NOTE
 	set_key_pressed($played_key, 1)
-
-	if (%current_mapping_data[$cur_note] > -1)
-		$instruments_mnu := %which_key_to_which_inst[%current_mapping_data[$cur_note]]
-	end if
 
 	{Select By MIDI Keyboard Only - NOT from the MIDI file playing}
 	if($cur_note # $last_note)
@@ -6339,3 +6412,31 @@ on pgs_changed
 			call update_mapping_editor_gui
 	end select
 end on
+
+on persistence_changed
+	wait(500000)
+	
+	call key_coloring
+	call update_sound_preset_menu
+	
+	$Preset_Category := pgs_get_key_val(PRESET_DATA, 5)
+	$category_mnu := $Preset_Category 
+	set_control_par(%category_controls_id[01],$CONTROL_PAR_PICTURE_STATE,$category_mnu)
+	call update_sound_preset_menu
+
+	pgs_set_key_val(COMMAND, 0, -1)
+	$count_1 := 0
+	while ($count_1 < 128)
+		pgs_set_key_val(MAPPING, 	 $count_1, %inverse_mapping_data[$count_1])
+		pgs_set_key_val(CUR_MAPPING, $count_1, %current_mapping_data[$count_1])
+		inc($count_1)
+	end while
+	pgs_set_key_val(COMMAND, 0, 6)
+
+	pgs_set_key_val(PURGE_MODE, 0, $purge_UNUSED)
+
+	call recall_data
+	call update_mapping_editor_gui
+	
+end on
+

@@ -1,5 +1,5 @@
 {***********************************************
-Drum Lab
+Drum Lab 1.2
 Grooves Page
 Author: Native Instruments
 Written by: Thanos Kazakos
@@ -76,15 +76,16 @@ on init
 	declare const $MERGE			:= 2
 
 	declare const $MIDI_PTTRN_LOW	:= 12
-	declare const $MIDI_PTTRN_HIGH	:= 23
+	declare const $MIDI_PTTRN_HIGH	:= 24
 	declare const $IS_KEYSWITCH		:= 12
 	declare const $MAX_NUM_PATTERNS	:= 12
 
 	declare $init_flag := 1
-	declare $midi_init := 0
+	declare $midi_init := 1
 	declare $count_1
 	declare $count_2
 	declare $count_3
+	declare $count_4
 	declare $group_count
 	declare $a
 	declare $b
@@ -202,6 +203,10 @@ on init
 	_1 suffix --> file original state. for recalling the original state without the need to reload the file
 	_2 suffix --> latest state of the file / used as the edit buffer}
 	declare $mf_num_events
+	
+	declare $mf_note_length
+
+	declare const $MIN_NOTE_LENGTH := 50
 
 	declare const $MF_LENGTH := 7680				{2 BARS in ticks}
 	declare $mf_tmp_length	 := $MF_LENGTH 			{the length of the MIDI file, ie the position of its last event - in ticks}
@@ -216,6 +221,7 @@ on init
 	declare !mf_loaded_paths[$MAX_NUM_PATTERNS]}
 
 	declare $active_midi_track := 0 {Track 0 always holds the loaded MIDI groove from }
+	make_instr_persistent($active_midi_track)
 	declare $check_note
 	declare $temp_midi_track
 	declare $mf_track_counter
@@ -227,6 +233,10 @@ on init
 	declare $mf_event_instrument
 	declare $mf_event_velocity
 
+	make_persistent($mf_event_position)
+	make_persistent($mf_event_position_ticks)
+	make_persistent($mf_event_instrument)
+	make_persistent($mf_event_velocity)
 
 	declare %key_has_pattern[$MAX_NUM_PATTERNS + 1]
 	make_persistent(%key_has_pattern)
@@ -364,8 +374,10 @@ on init
 {length function variables}
 	declare $stretch_amt
 	declare $visual_stretch
-	make_persistent($visual_stretch)
-	read_persistent_var($visual_stretch)
+	{make_persistent($visual_stretch)
+	read_persistent_var($visual_stretch)}
+	make_instr_persistent($stretch_amt)
+	make_instr_persistent($visual_stretch)
 
 {playback related variables}
 	declare $wrap_flag
@@ -581,31 +593,40 @@ on init
 	make_persistent(@file_path)
 	make_persistent(@file_name)
 	make_persistent(@last_file_path)
-	make_persistent($grid_sld)
+	{make_persistent($grid_sld)
 	make_persistent($quantize_sld)
 	make_persistent($swing_sld)
 	make_persistent($velocity_sld)
 	make_persistent($half_btn)
 	make_persistent($normal_btn)
-	make_persistent($double_btn)
+	make_persistent($double_btn)}
 	read_persistent_var(@file_path)
 	read_persistent_var(@file_name)
 	read_persistent_var(@last_file_path)
-	read_persistent_var($grid_sld)
+	{read_persistent_var($grid_sld)
 	read_persistent_var($quantize_sld)
 	read_persistent_var($swing_sld)
 	read_persistent_var($velocity_sld)
 	read_persistent_var($half_btn)
 	read_persistent_var($normal_btn)
-	read_persistent_var($double_btn)
+	read_persistent_var($double_btn)}
+
+	make_instr_persistent($grid_sld)
+	make_instr_persistent($quantize_sld)
+	make_instr_persistent($swing_sld)
+	make_instr_persistent($velocity_sld)
+	make_instr_persistent($half_btn)
+	make_instr_persistent($normal_btn)
+	make_instr_persistent($double_btn)
+
 	$quant_resol := %quant_resol_transform[$grid_sld]
 	$swing_cycle := %swing_cycle_transform[$grid_sld]	
-	$quantize_sld := 0
+	{$quantize_sld := 0
 	$swing_sld := 0
 	$velocity_sld := 0
 	$half_btn := 0
 	$normal_btn := 1
-	$double_btn := 0
+	$double_btn := 0}
 	$swing_amount := $swing_sld
 	$quant_amount := $quantize_sld
 	if ($velocity_sld < 0)
@@ -617,8 +638,8 @@ on init
 	end if
 
 	declare $first_time_ever_flag := 1
-	{make_persistent($first_time_ever_flag)
-	read_persistent_var($first_time_ever_flag)}
+	make_persistent($first_time_ever_flag)
+	read_persistent_var($first_time_ever_flag)
 	if ($first_time_ever_flag = 1)
 		@file_path := get_folder($GET_FOLDER_LIBRARY_DIR) & "MIDI Files/03 Fat/132bpm Driver/02 Hat Snare.mid"
 	end if
@@ -1131,6 +1152,9 @@ on init
 {Mapping}
 	declare %inverse_mapping_data[128]
 	make_persistent(%inverse_mapping_data)
+	read_persistent_var(%inverse_mapping_data)
+
+	make_instr_persistent(%inverse_mapping_data)
 	
 	declare %default_mapping_data[128] := (-1)
 			{%default_mapping_data[22] := 78}		{CHOKE 1-5}
@@ -1189,8 +1213,10 @@ on init
         set_control_par(get_ui_id($map_to_NOTE), $CONTROL_PAR_POS_X,  536) 
         set_control_par(get_ui_id($map_to_NOTE), $CONTROL_PAR_POS_Y,  233)
 
-    make_persistent($map_to_NOTE)
-    read_persistent_var($map_to_NOTE)
+    {make_persistent($map_to_NOTE)
+    read_persistent_var($map_to_NOTE)}
+
+    make_instr_persistent($map_to_NOTE)
 
     declare ui_label $note_mapping_bg(1,1)
     declare $note_mapping_bg_id
@@ -2224,6 +2250,9 @@ function visualize_MIDI
 
 				set_control_par(%midi_lbl_id[$mf_event_instrument * 32 + $mf_event_position], $CONTROL_PAR_POS_X, 25 + $mf_event_position_ticks)
 				set_control_par(%midi_lbl_id[$mf_event_instrument * 32 + $mf_event_position], $CONTROL_PAR_PICTURE_STATE,$mf_event_velocity)
+				{remap to current mapping}
+				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_MIDI_BYTE_1, %inverse_mapping_data[%default_mapping_data[mf_get_byte_one()]])
+				message("")
 				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_0, $processed_flag_value)
 				{message("")}
 				inc($count_1)
@@ -2281,12 +2310,19 @@ function load_file
 		wait(1000)
 	end while
 
-	mf_get_first($TRACK_IDX)
-	while (mf_get_command() # 0)
-		if (mf_get_command() = $MIDI_COMMAND_NOTE_ON)
-			mf_set_byte_one(%default_mapping_data[mf_get_byte_one()])
-		end if
-		mf_get_next($TRACK_IDX)
+	$count_1 := 1
+	while ($count_1 > 0)
+		mf_get_first($track_idx)
+		$count_1 := 0
+		while (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_MIDI_COMMAND) # 0)
+			if (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_0) # $processed_flag_value)
+				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_MIDI_BYTE_1, %default_mapping_data[mf_get_byte_one()])
+				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_0, $processed_flag_value)
+				inc($count_1)
+			end if
+			mf_get_next($track_idx)
+			wait(1)
+		end while
 	end while
 
 	mf_set_export_area(@file_name, -1,-1,0,0)
@@ -3029,7 +3065,8 @@ on ui_control ($file_selector)
 		$first_time_ever_flag := 0
 	end if
 	
-	{$first_time_ever_flag := 1}
+	{$first_time_ever_flag := 1
+	message($first_time_ever_flag)}
 	
 	@file_path := fs_get_filename(%ui_id[0], 2)
 	@file_name := fs_get_filename(%ui_id[0], 0)
@@ -3536,7 +3573,7 @@ on note
 		inc($count_1)
 	end while
 
-	if ($map_to_NOTE = 1 and in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH))
+	if ($map_to_NOTE = 1 and in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH - 1))
 		
 		$active_midi_track := $EVENT_NOTE - 12
 		
@@ -3557,7 +3594,7 @@ on note
 		call show_hide_file_browser
 		call gui_keys_coloring
 	else
-		if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH) {and $play_btn = 1} and $pattern_edit_flag = 1)
+		if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH - 1) and $pattern_edit_flag = 1)
 			if (%key_has_pattern[$EVENT_NOTE - 12] = $YES and $last_pattern_selected # $EVENT_NOTE - 12)
 				
 				$active_midi_track := $EVENT_NOTE - 12
@@ -3611,7 +3648,7 @@ on note
 		end if
 	end if
 
-	if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH) and get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) = -1)
+	if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH - 1) and get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) = -1)
 		set_event_par($EVENT_ID,$EVENT_PAR_1,$IS_KEYSWITCH)
 		$play_btn := 1
 		$playing_flag := 1
@@ -3620,7 +3657,7 @@ on note
 end on
 
 on release
-	if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH) and get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) = -1)
+	if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH - 1) and get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) = -1)
 		dec($key_counter)
 	end if
 
@@ -3693,8 +3730,14 @@ on listener
 				wait($diff)
 			end if
 			
+			$mf_note_length := ticks_to_ms(mf_get_note_length())
+			if ($mf_note_length < $MIN_NOTE_LENGTH)
+				$mf_note_length := $MIN_NOTE_LENGTH
+			end if
+
+
 			if (mf_get_command() = $MIDI_COMMAND_NOTE_ON)
-				play_note(mf_get_byte_one(),mf_get_byte_two(),0,ticks_to_ms(mf_get_note_length()))
+				play_note(mf_get_byte_one(),mf_get_byte_two(),0,$mf_note_length)
 			end if
 			
 			mf_get_next(0)
@@ -3784,8 +3827,7 @@ on pgs_changed
 					inc($count_1)
 				end while
 			end if
-
-		case $SOUND
+		case 1
 			if (pgs_get_key_val(PRESET_DATA, 4) = 1) {update because of save |OR| delete}
 				$sound_preset_load_id_1 := load_array(%user_num_snd_Presets,1)
 				$sound_preset_load_id_2 := load_array(!user_sound_preset_names,1)
@@ -3862,7 +3904,7 @@ on pgs_changed
 				set_control_par(%category_controls_id[01],$CONTROL_PAR_PICTURE_STATE,$category_mnu)
 				call update_sound_preset_menu
 			end if
-		case $GROOVE
+		case 2
 			if (pgs_get_key_val(GROOVE_ACTION, 1) = 1)
 				if ($processing_flag # 1)
 					fs_navigate(%ui_id[0], 0)
@@ -3903,14 +3945,126 @@ on pgs_changed
 					end if
 				end if
 			end if
-		case $MAPPING
+		case 6
 			$count_1 := 0
 			while ($count_1 < 128)
 				%inverse_mapping_data[$count_1] := pgs_get_key_val(MAPPING, $count_1)
+				wait(1)   
 				inc($count_1)
 			end while
 	
+			{call load_file}
 			call process_midi_file
-
 	end select
 end on
+
+on persistence_changed
+	wait(500000)
+
+	$quant_resol := %quant_resol_transform[$grid_sld]
+	$swing_cycle := %swing_cycle_transform[$grid_sld]	
+	
+	$swing_amount := $swing_sld
+	$quant_amount := $quantize_sld
+	
+	if ($velocity_sld < 0)
+		$lower := 1
+		$higher := 127 + $velocity_sld
+	else
+		$lower := $velocity_sld
+		$higher := 127
+	end if
+
+	if ($map_to_NOTE = 1)
+		set_control_par(%ui_id[0],$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+		set_control_par($note_mapping_bg_id, $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+		$kb_count_1 := 0
+		while ($kb_count_1 < num_elements(%kb_id))
+			set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)	
+			inc($kb_count_1)
+		end while
+	else
+		set_control_par(%ui_id[0],$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+		set_control_par($note_mapping_bg_id, $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+		$kb_count_1 := 0
+		while ($kb_count_1 < num_elements(%kb_id))
+			set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)	
+			inc($kb_count_1)
+		end while
+	end if
+
+	if ($first_time_ever_flag = 1)
+		@file_path := get_folder($GET_FOLDER_LIBRARY_DIR) & "MIDI Files/03 Fat/132bpm Driver/02 Hat Snare.mid"
+	end if
+
+	{MIDI FILE LOAD PERSISTENCY}
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+				pgs_set_key_val(COMMAND, 0, -1)
+				pgs_set_key_val(LOADED_MIDI, $count_1, 1)
+				set_key_color($count_1 + 12, $KEY_COLOR_GREEN)
+			else
+				$pattern_edit_flag := 0
+				pgs_set_key_val(COMMAND, 0, -1)
+				pgs_set_key_val(LOADED_MIDI, $count_1, 0)
+			end if
+			inc($count_1)
+		end while
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$load_mf_id := mf_insert_file(@file_path, 0, 0, $REPLACE_ALL)
+		mf_set_export_area(@file_name, -1, -1, 0, 0)
+		
+		pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(GROOVE_ACTION, 1, 0)
+			pgs_set_key_val(GROOVE_ACTION, 2, 0)
+			pgs_set_key_val(GROOVE_ACTION, 3, 1)
+			pgs_set_str_key_val(GROOVE_TITLE, @file_name)
+			@file_name := pgs_get_str_key_val(GROOVE_TITLE)
+			set_text($groove_display_lbl, @file_name)
+		pgs_set_key_val(COMMAND, 0, 2)
+		{$init_flag  := 0
+		$midi_init	:= 1}
+
+	$Preset_Category := pgs_get_key_val(PRESET_DATA, 5)
+	$category_mnu := $Preset_Category 
+	set_control_par(%category_controls_id[01],$CONTROL_PAR_PICTURE_STATE,$category_mnu)
+
+	call update_sound_preset_menu
+
+	!mf_loaded_names[00] := @loaded_mf_name_01
+	!mf_loaded_names[01] := @loaded_mf_name_02
+	!mf_loaded_names[02] := @loaded_mf_name_03
+	!mf_loaded_names[03] := @loaded_mf_name_04
+	!mf_loaded_names[04] := @loaded_mf_name_05
+	!mf_loaded_names[05] := @loaded_mf_name_06
+	!mf_loaded_names[06] := @loaded_mf_name_07
+	!mf_loaded_names[07] := @loaded_mf_name_08
+	!mf_loaded_names[08] := @loaded_mf_name_09
+	!mf_loaded_names[09] := @loaded_mf_name_10
+	!mf_loaded_names[10] := @loaded_mf_name_11
+	!mf_loaded_names[11] := @loaded_mf_name_12
+
+	!mf_loaded_paths[00] := @loaded_mf_path_01
+	!mf_loaded_paths[01] := @loaded_mf_path_02
+	!mf_loaded_paths[02] := @loaded_mf_path_03
+	!mf_loaded_paths[03] := @loaded_mf_path_04
+	!mf_loaded_paths[04] := @loaded_mf_path_05
+	!mf_loaded_paths[05] := @loaded_mf_path_06
+	!mf_loaded_paths[06] := @loaded_mf_path_07
+	!mf_loaded_paths[07] := @loaded_mf_path_08
+	!mf_loaded_paths[08] := @loaded_mf_path_09
+	!mf_loaded_paths[09] := @loaded_mf_path_10
+	!mf_loaded_paths[10] := @loaded_mf_path_11
+	!mf_loaded_paths[11] := @loaded_mf_path_12
+
+	pgs_set_key_val(COMMAND, 0, -1)
+	pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+	pgs_set_key_val(COMMAND, 0, 2)
+	call gui_keys_coloring
+
+end on
+
+

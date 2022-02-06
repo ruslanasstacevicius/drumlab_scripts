@@ -1,9 +1,9 @@
 {***********************************************
-Drum Lab
+Drum Lab 1.2
 Kit Page
 Author: Native Instruments
 Written by: Thanos Kazakos
-Modified: August 7th, 2013
+Modified: August 28th, 2014
 *************************************************}
 
 on init
@@ -13,6 +13,18 @@ on init
 	make_perfview
 	set_ui_height_px(540)
 	set_control_par_str($INST_WALLPAPER_ID,$CONTROL_PAR_PICTURE,"background")
+
+	{snapshot values}
+	declare $init_LOADED := 1
+	declare $cur_tile_value
+	declare $cur_instrument_value
+	declare $source_TAB_value
+	declare $effects_TAB_value
+
+	set_snapshot_type(1) {1: init callback is not executed upon snapshot loading}
+	{when set to 0: init AND persistence_changed callbacks are executed (default case)
+	 when set to 1: ONLY persistence_changed callback is executed
+	 • Note: the persistence_changed callback is ALWAYS executed, thus it can be seen as an EXTENTION to the init callback.}
 
     declare $debug
     declare %debug[19] := (-2)
@@ -1029,7 +1041,9 @@ on init
 
 	declare $last_tile
 	declare $played_tile
-	declare $cur_tile := $TILE_KICK
+	declare $cur_tile
+	make_persistent($cur_tile)
+	read_persistent_var($cur_tile)
 	$cur_instrument := %Tile_to_Inst_remap[$cur_tile]	
 	declare $tile_pointer
 	$last_tile := $cur_tile
@@ -1078,21 +1092,6 @@ on init
 	declare const $last_perc3_vel	:= 115
 	declare const $last_perc4_vel	:= 115
 	declare const $last_perc5_vel	:= 115
-
-	{make_persistent($last_kick_vel)
-	make_persistent($last_snare_vel)
-	make_persistent($last_hihat_vel)
-	make_persistent($last_tom1_vel)
-	make_persistent($last_tom2_vel)
-	make_persistent($last_tom3_vel)
-	make_persistent($last_cymb1_vel)
-	make_persistent($last_cymb2_vel)
-	make_persistent($last_cymb3_vel)
-	make_persistent($last_perc1_vel)
-	make_persistent($last_perc2_vel)
-	make_persistent($last_perc3_vel)
-	make_persistent($last_perc4_vel)
-	make_persistent($last_perc5_vel)}
 
 	declare %tile_Selected[$NUM_TILES]
 	%tile_Selected[$cur_tile] := 1
@@ -1508,6 +1507,8 @@ on init
 			%Tile_has_Mixer[$TILE_CYMB2]  := $NULL
 			%Tile_has_Mixer[$TILE_CYMB3]  := $NULL
 
+			make_persistent(%Tile_has_Mixer)
+
 	declare %Tile_to_Bus[$NUM_TILES]	:= ($NULL)
 			%Tile_to_Bus[$TILE_OHS]		:= $BUS_OHS
 			%Tile_to_Bus[$TILE_OHM]		:= $BUS_OHM
@@ -1520,6 +1521,8 @@ on init
 			%Tile_to_Bus[$TILE_HIHAT]	:= $BUS_HIHAT
 			%Tile_to_Bus[$TILE_SNARE]	:= $BUS_SNARE
 			%Tile_to_Bus[$TILE_KICK]	:= $BUS_KICK
+
+			make_persistent(%Tile_to_Bus)
 
 {MUTE CONTROLS}
 	declare @mute_picture
@@ -1551,6 +1554,19 @@ on init
 	%mute_id[$TILE_HIHAT]	:= get_ui_id($mute_HIHAT)
 	%mute_id[$TILE_SNARE]	:= get_ui_id($mute_SNARE)
 	%mute_id[$TILE_KICK]	:= get_ui_id($mute_KICK)
+
+	make_persistent($mute_OHS)
+	make_persistent($mute_OHM)
+	make_persistent($mute_ROOM)
+	make_persistent($mute_REV)
+	make_persistent($mute_PERC2)
+	make_persistent($mute_PERC3)
+	make_persistent($mute_TOM1)
+	make_persistent($mute_TOM2)
+	make_persistent($mute_TOM3)
+	make_persistent($mute_HIHAT)
+	make_persistent($mute_SNARE)
+	make_persistent($mute_KICK)
 	
 	$tile_count := 0
 	while($tile_count < $NUM_TILES)
@@ -1578,7 +1594,6 @@ on init
 	make_persistent(%mute_state)
 	read_persistent_var(%mute_state)
 	
-
 	$tile_count := 0
 	while($tile_count < $NUM_TILES)
 		if (%Tile_has_Mixer[$tile_count] > 0)
@@ -1634,6 +1649,19 @@ on init
 	%solo_id[$TILE_HIHAT]	:= get_ui_id($solo_HIHAT)
 	%solo_id[$TILE_SNARE]	:= get_ui_id($solo_SNARE)
 	%solo_id[$TILE_KICK]	:= get_ui_id($solo_KICK)
+
+	make_persistent($solo_OHS)
+	make_persistent($solo_OHM)
+	make_persistent($solo_ROOM)
+	make_persistent($solo_REV)
+	make_persistent($solo_PERC2)
+	make_persistent($solo_PERC3)
+	make_persistent($solo_TOM1)
+	make_persistent($solo_TOM2)
+	make_persistent($solo_TOM3)
+	make_persistent($solo_HIHAT)
+	make_persistent($solo_SNARE)
+	make_persistent($solo_KICK)
 	
 	$tile_count := 0
 	while($tile_count < $NUM_TILES)
@@ -1705,7 +1733,7 @@ on init
 	        %pan_id[$TILE_HIHAT]  := get_ui_id($pan_HIHAT)
 	        %pan_id[$TILE_SNARE]  := get_ui_id($pan_SNARE)
 	        %pan_id[$TILE_KICK]	  := get_ui_id($pan_KICK)
-	
+
 	$tile_count := 0
 	while($tile_count < $NUM_TILES)
 		if (%Tile_has_Mixer[$tile_count] > 0)
@@ -1851,7 +1879,8 @@ on init
 	%volfader_id[$TILE_HIHAT]		:= get_ui_id($vol_HIHAT)
 	%volfader_id[$TILE_SNARE]		:= get_ui_id($vol_SNARE)
 	%volfader_id[$TILE_KICK]		:= get_ui_id($vol_KICK)
-	
+
+
 	$tile_count := 0
 	while($tile_count < $NUM_TILES)
 		if (%Tile_has_Mixer[$tile_count] > 0)
@@ -2217,6 +2246,8 @@ on init
 	make_persistent(%channel_output)
 	read_persistent_var(%channel_output)
 
+	make_instr_persistent(%channel_output)
+
 	$tile_count := 0
 	while($tile_count < $NUM_TILES)
 		if (%Tile_has_Mixer[$tile_count] > 0)
@@ -2365,7 +2396,7 @@ on init
 	make_persistent($opn_HH_pgs_value)
 	read_persistent_var($opn_HH_pgs_value)
 	pgs_create_key(ELEC_DELAY_OPN_HH, 1)
-	pgs_set_key_val(ELEC_DELAY_OPN_HH, 0, $opn_HH_pgs_value)	
+	pgs_set_key_val(ELEC_DELAY_OPN_HH, 0, $opn_HH_pgs_value)
 
 	declare ui_slider $ac_el_BALANCE (0, 10000)
 	{acoustic layer}
@@ -2778,6 +2809,8 @@ on init
 			%Tile_has_Ac_Layers[$TILE_PERC4] := $YES
 			%Tile_has_Ac_Layers[$TILE_PERC5] := $YES
 
+			make_persistent(%Tile_has_Ac_Layers)
+
 	declare %Tile_DOES_NOT_have_EL_Layers[$NUM_TILES]	:= ($NULL)
 			%Tile_DOES_NOT_have_EL_Layers[$TILE_OHS]	:= $YES
 			%Tile_DOES_NOT_have_EL_Layers[$TILE_OHM]	:= $YES
@@ -2790,6 +2823,8 @@ on init
 			%Tile_DOES_NOT_have_EL_Layers[$TILE_CYMB1]	:= $YES
 			%Tile_DOES_NOT_have_EL_Layers[$TILE_CYMB2]	:= $YES
 			%Tile_DOES_NOT_have_EL_Layers[$TILE_CYMB3]	:= $YES
+
+			make_persistent(%Tile_DOES_NOT_have_EL_Layers)
 
 	pgs_create_key(ACTIVE_KICK, 1)
 	pgs_create_key(ACTIVE_SNARE, 1)
@@ -3083,6 +3118,8 @@ on init
 	%Tile_has_El_Layers[$TILE_TOM1]			:= $YES
 	%Tile_has_El_Layers[$TILE_TOM2]			:= $YES
 	%Tile_has_El_Layers[$TILE_TOM3]			:= $YES
+
+	make_persistent(%Tile_has_El_Layers)
 
 	declare !El_Layer_Pictures[$NUM_TILES]
 	!El_Layer_Pictures[$TILE_KICK]	:= "label-kick2"
@@ -8001,10 +8038,18 @@ on init
 	read_persistent_var($source_TAB)
 	read_persistent_var($effects_TAB)
 	
-	declare $gui_update
-	set_listener($NI_SIGNAL_TIMER_MS,500)
+	{declare $gui_update}
+	{set_listener($NI_SIGNAL_TIMER_MS,500)}
 
 	$init_flag := 0
+
+{Snapshot Isolation}
+	make_instr_persistent($cur_tile)
+	make_instr_persistent($cur_instrument)
+	make_instr_persistent($source_TAB)
+	make_instr_persistent($effects_TAB)
+	make_instr_persistent($select_by_midi)
+
 end on
 {/INIT}
 
@@ -8138,37 +8183,41 @@ function update_SOURCE_Values
 		inc($c)
 	end while
 	{Instrument Change}
-	if (%Tile_has_Ac_Layers[$tile_pointer] = $YES)
-		set_control_par(%Ac_Layer_Menu_id[$tile_pointer], $CONTROL_PAR_VALUE, %Ac_Inst_Selection[$tile_pointer])
-		set_control_par(%Ac_src_Pic_id[$tile_pointer], $CONTROL_PAR_PICTURE_STATE,get_control_par(%Ac_Layer_Menu_id[$tile_pointer],$CONTROL_PAR_VALUE))
-		select ($tile_pointer)
-			case $TILE_PERC1
-				$perc_A_recall := %Ac_Inst_Selection[$tile_pointer]
-				set_control_par_str(%tile_control_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_A_pics[$perc_A_recall])
-				set_control_par_str(     %tile_bg_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_A_pics_bg[$perc_A_recall])
-			case $TILE_PERC2
-				$perc_B_recall := %Ac_Inst_Selection[$tile_pointer]
-				set_control_par_str(%tile_control_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_B_pics[$perc_B_recall])
-				set_control_par_str(     %tile_bg_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_B_pics_bg[$perc_B_recall])
-			case $TILE_PERC3
-				$perc_C_recall := %Ac_Inst_Selection[$tile_pointer]
-				set_control_par_str(%tile_control_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_C_pics[$perc_C_recall])
-				set_control_par_str(     %tile_bg_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_C_pics_bg[$perc_C_recall])
-			case $TILE_PERC4
-				$perc_D_recall := %Ac_Inst_Selection[$tile_pointer]
-				set_control_par_str(%tile_control_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_D_pics[$perc_D_recall])
-				set_control_par_str(     %tile_bg_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_D_pics_bg[$perc_D_recall])
-			case $TILE_PERC5
-				$perc_E_recall := %Ac_Inst_Selection[$tile_pointer]
-				set_control_par_str(%tile_control_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_E_pics[$perc_E_recall])
-				set_control_par_str(     %tile_bg_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_E_pics_bg[$perc_E_recall])
-		end select
-			
-		if (%Tile_has_El_Layers[$tile_pointer] = $YES)
-			set_control_par(%El_Layer_Menu_id[$tile_pointer], $CONTROL_PAR_VALUE, %El_Inst_Selection[$tile_pointer])
-			set_control_par(%El_src_Pic_id[$tile_pointer], $CONTROL_PAR_PICTURE_STATE,get_control_par(%El_Layer_Menu_id[$tile_pointer],$CONTROL_PAR_VALUE))
+	$tile_pointer := 0
+	while ($tile_pointer < $NUM_TILES)
+		if (%Tile_has_Ac_Layers[$tile_pointer] = $YES)
+			set_control_par(%Ac_Layer_Menu_id[$tile_pointer], $CONTROL_PAR_VALUE, %Ac_Inst_Selection[$tile_pointer])
+			set_control_par(%Ac_src_Pic_id[$tile_pointer], $CONTROL_PAR_PICTURE_STATE,get_control_par(%Ac_Layer_Menu_id[$tile_pointer],$CONTROL_PAR_VALUE))
+			select ($tile_pointer)
+				case $TILE_PERC1
+					$perc_A_recall := %Ac_Inst_Selection[$tile_pointer]
+					set_control_par_str(%tile_control_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_A_pics[$perc_A_recall])
+					set_control_par_str(     %tile_bg_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_A_pics_bg[$perc_A_recall])
+				case $TILE_PERC2
+					$perc_B_recall := %Ac_Inst_Selection[$tile_pointer]
+					set_control_par_str(%tile_control_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_B_pics[$perc_B_recall])
+					set_control_par_str(     %tile_bg_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_B_pics_bg[$perc_B_recall])
+				case $TILE_PERC3
+					$perc_C_recall := %Ac_Inst_Selection[$tile_pointer]
+					set_control_par_str(%tile_control_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_C_pics[$perc_C_recall])
+					set_control_par_str(     %tile_bg_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_C_pics_bg[$perc_C_recall])
+				case $TILE_PERC4
+					$perc_D_recall := %Ac_Inst_Selection[$tile_pointer]
+					set_control_par_str(%tile_control_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_D_pics[$perc_D_recall])
+					set_control_par_str(     %tile_bg_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_D_pics_bg[$perc_D_recall])
+				case $TILE_PERC5
+					$perc_E_recall := %Ac_Inst_Selection[$tile_pointer]
+					set_control_par_str(%tile_control_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_E_pics[$perc_E_recall])
+					set_control_par_str(     %tile_bg_id[$tile_pointer], $CONTROL_PAR_PICTURE, !perc_E_pics_bg[$perc_E_recall])
+			end select
+				
+			if (%Tile_has_El_Layers[$tile_pointer] = $YES)
+				set_control_par(%El_Layer_Menu_id[$tile_pointer], $CONTROL_PAR_VALUE, %El_Inst_Selection[$tile_pointer])
+				set_control_par(%El_src_Pic_id[$tile_pointer], $CONTROL_PAR_PICTURE_STATE,get_control_par(%El_Layer_Menu_id[$tile_pointer],$CONTROL_PAR_VALUE))
+			end if
 		end if
-	end if
+		inc($tile_pointer)
+	end while
 end function
 
 function update_MASTER_FX_Values
@@ -8188,6 +8237,10 @@ end function
 function tile_Select
 	{description: sets the values of the selectors and displays the fx of the selected channel}
 	{variables = $cur_tile, $helper}
+
+	$cur_tile_value			:= $cur_tile
+	$cur_instrument_value	:= $cur_instrument
+
 	if(get_control_par(%tile_control_id[$cur_tile],$CONTROL_PAR_VALUE) = 0)
 		set_control_par(%tile_control_id[$cur_tile],$CONTROL_PAR_VALUE,1)
 		if (%Tile_has_VU[$cur_tile] = $YES)
@@ -8939,7 +8992,7 @@ function tile_Select
 			set_control_par(%Ac_Arrow_id[01], 			  $CONTROL_PAR_POS_Y, get_control_par(%Ac_src_Pic_id[$cur_tile],$CONTROL_PAR_POS_Y) - 2)
 	end select
 	call update_FX_Values
-	$tile_pointer := $cur_tile
+	{$tile_pointer := $cur_tile}
 	call update_SOURCE_Values
 end function
 
@@ -8993,56 +9046,56 @@ end function
 		call tile_Select
 	end on
 	on ui_control ($PERC1_TL)
-		$cur_tile :=  $TILE_PERC1
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_PERC1
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_perc1, $last_perc1_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($PERC2_TL)
-		$cur_tile :=  $TILE_PERC2
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_PERC2
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_perc2, $last_perc2_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($PERC3_TL)
-		$cur_tile :=  $TILE_PERC3
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_PERC3
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_perc3, $last_perc3_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($TOM1_TL)
-		$cur_tile :=  $TILE_TOM1
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_TOM1
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_tom1, $last_tom1_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($TOM2_TL)
-		$cur_tile :=  $TILE_TOM2
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_TOM2
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_tom2, $last_tom2_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($TOM3_TL)
-		$cur_tile :=  $TILE_TOM3
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_TOM3
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_tom3, $last_tom3_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($CYMB1_TL)
-		$cur_tile :=  $TILE_CYMB1
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_CYMB1
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_cymb1, $last_cymb1_vel, 0, 0)
@@ -9050,59 +9103,60 @@ end function
 	end on
 	on ui_control ($MASTER_TL)
 		$cur_tile :=  $TILE_MASTER
+		$cur_tile_value := $cur_tile
 		call tile_Select
 	end on
 	on ui_control ($PERC4_TL)
-		$cur_tile :=  $TILE_PERC4
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_PERC4
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_perc4, $last_perc4_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($HIHAT_TL)
-		$cur_tile :=  $TILE_HIHAT
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_HIHAT
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_hihat, $last_hihat_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($SNARE_TL)
-		$cur_tile :=  $TILE_SNARE
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_SNARE
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_snare, $last_snare_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($KICK_TL)
-		$cur_tile :=  $TILE_KICK
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_KICK
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_kick, $last_kick_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($CYMB2_TL)
-		$cur_tile :=  $TILE_CYMB2
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_CYMB2
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_cymb2, $last_cymb2_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($PERC5_TL)
-		$cur_tile :=  $TILE_PERC5
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_PERC5
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_perc5, $last_perc5_vel, 0, 0)
 		end if
 	end on
 	on ui_control ($CYMB3_TL)
-		$cur_tile :=  $TILE_CYMB3
-		$cur_instrument := %Tile_to_Inst_remap[$cur_tile]
+		$cur_tile				:= $TILE_CYMB3
+		$cur_instrument			:= %Tile_to_Inst_remap[$cur_tile]
 		call tile_Select
 		if ($play_btn # 1)
 			play_note($last_played_cymb3, $last_cymb3_vel, 0, 0)
@@ -9113,8 +9167,11 @@ on ui_control ($source_TAB)
 	if ($source_TAB = 1)
 		$source_TAB	 := 1
 		$effects_TAB := 0
+		$source_TAB_value := $source_TAB
+		$effects_TAB_value := $effects_TAB
 	else
 		$source_TAB	 := 1
+		$source_TAB_value := $source_TAB
 	end if
 	call tile_Select
 end on
@@ -9123,8 +9180,11 @@ on ui_control ($effects_TAB)
 	if ($effects_TAB = 1)
 		$effects_TAB := 1
 		$source_TAB	 := 0
+		$effects_TAB_value := $effects_TAB
+		$source_TAB_value := $source_TAB
 	else
 		$effects_TAB := 1
+		$effects_TAB_value := $effects_TAB
 	end if
 	call tile_Select
 end on	
@@ -9147,37 +9207,46 @@ end on
 	end function
 
 	function update_AC_PURGE_state
-		$mic_count := 0
-		while ($mic_count < 8)
-			if (%AC_GROUP_DATA[%AC_INSTRUMENT_OFFSET[%Tile_to_Inst_remap[$cur_tile]] * 8 + $mic_count] >= 0)
-    			$mic_group_offset := %AC_GROUP_DATA[%AC_INSTRUMENT_OFFSET[%Tile_to_Inst_remap[$cur_tile]] * 8 + $mic_count]
-    			$group_count	  := %AC_GROUP_DATA[%AC_INSTRUMENT_OFFSET[%Tile_to_Inst_remap[$cur_tile]] * 8 + $mic_count]
-    			while ($group_count < %Ac_Layer_per_Tile[$cur_tile] + $mic_group_offset)
-    				%Ac_Group_PURGE_State[$group_count] := 0
-    				inc($group_count)
-    			end while
-    			%Ac_Group_PURGE_State[%AC_GROUP_DATA[%AC_INSTRUMENT_OFFSET[%Tile_to_Inst_remap[$cur_tile]] * 8 + $mic_count] + %Ac_Inst_Selection[$cur_tile]] := 1
-			end if
-			inc($mic_count)
-		end while
-		pgs_set_key_val(COMMAND, 0, -1)
-		$group_count := 0
-		while ($group_count < $AC_NUM_GROUPS)
-			pgs_set_key_val(AC_LOAD_PURGE_STATE, $group_count, %Ac_Group_PURGE_State[$group_count])
-			inc($group_count)
-			wait(1)   
-		end while
-		pgs_set_key_val(COMMAND, 0, 0)
+		if (%Tile_has_Ac_Layers[$cur_tile] = $YES)	
+			$mic_count := 0
+			while ($mic_count < 8)
+				if (%AC_GROUP_DATA[%AC_INSTRUMENT_OFFSET[%Tile_to_Inst_remap[$cur_tile]] * 8 + $mic_count] >= 0)
+	    			$mic_group_offset := %AC_GROUP_DATA[%AC_INSTRUMENT_OFFSET[%Tile_to_Inst_remap[$cur_tile]] * 8 + $mic_count]
+	    			$group_count	  := %AC_GROUP_DATA[%AC_INSTRUMENT_OFFSET[%Tile_to_Inst_remap[$cur_tile]] * 8 + $mic_count]
+	    			while ($group_count < %Ac_Layer_per_Tile[$cur_tile] + $mic_group_offset)
+	    				%Ac_Group_PURGE_State[$group_count] := 0
+	    				inc($group_count)
+	    			end while
+	    			%Ac_Group_PURGE_State[%AC_GROUP_DATA[%AC_INSTRUMENT_OFFSET[%Tile_to_Inst_remap[$cur_tile]] * 8 + $mic_count] + %Ac_Inst_Selection[$cur_tile]] := 1
+				end if
+				inc($mic_count)
+			end while
+			pgs_set_key_val(COMMAND, 0, -1)
+			$group_count := 0
+			while ($group_count < $AC_NUM_GROUPS)
+				pgs_set_key_val(AC_LOAD_PURGE_STATE, $group_count, %Ac_Group_PURGE_State[$group_count])
+				inc($group_count)
+				wait(1)   
+			end while
+			pgs_set_key_val(COMMAND, 0, 0)
+		end if	
 	end function
 
 	function update_EL_PURGE_state
-		$elec_grp_offset := %EL_GROUP_DATA[%Tile_to_Inst_remap[$cur_tile]] - $AC_NUM_GROUPS
-		$group_count := %EL_GROUP_DATA[%Tile_to_Inst_remap[$cur_tile]] - $AC_NUM_GROUPS
+
+		if (%Tile_has_El_Layers[$cur_tile] = $YES)
+			$elec_grp_offset := %EL_GROUP_DATA[%Tile_to_Inst_remap[$cur_tile]] - $AC_NUM_GROUPS
+			$group_count := %EL_GROUP_DATA[%Tile_to_Inst_remap[$cur_tile]] - $AC_NUM_GROUPS
+		end if
+		
 		while ($group_count < %El_Layer_per_Tile[$cur_tile] + $elec_grp_offset)
 			%El_Group_PURGE_State[$group_count] := 0
 			inc($group_count)
 		end while
-		%El_Group_PURGE_State[%EL_GROUP_DATA[%Tile_to_Inst_remap[$cur_tile]] - $AC_NUM_GROUPS + %El_Inst_Selection[$cur_tile]] := 1
+		
+		if (%Tile_has_El_Layers[$cur_tile] = $YES)
+			%El_Group_PURGE_State[%EL_GROUP_DATA[%Tile_to_Inst_remap[$cur_tile]] - $AC_NUM_GROUPS + %El_Inst_Selection[$cur_tile]] := 1
+		end if
 
 		pgs_set_key_val(COMMAND, 0, -1)
 		$group_count := 0
@@ -12201,6 +12270,12 @@ end on
 					set_engine_par($ENGINE_PAR_SEND_EFFECT_BYPASS, $solo_check, -1, $REVERB_SLOT,0) {bypass the reverb depending on whether there is something soloed or not}
 				end if
 
+				if (get_control_par(%mute_id[$TILE_REV],$CONTROL_PAR_VALUE) = 1) {if mute REV is pressed}
+					set_engine_par($ENGINE_PAR_SEND_EFFECT_BYPASS, 1, -1, $REVERB_SLOT,0) {keep the reverb bypassed depending on whether there is something soloed or not}
+				else
+					set_engine_par($ENGINE_PAR_SEND_EFFECT_BYPASS, 0, -1, $REVERB_SLOT,0)
+				end if
+
 				$c := 0
 				if ($solo_check = 0)
 					if ($rev_check = 1)
@@ -12374,9 +12449,9 @@ end on
 		set_control_par_str(%output_id[$TILE_PERC2],$CONTROL_PAR_TEXT,get_menu_item_str(%output_id[$TILE_PERC2], $output_PERC2 + 1))
 	end on
 	on ui_control($output_PERC3)
-		%channel_output[$TILE_PERC2] := $output_PERC3
-		set_engine_par($ENGINE_PAR_OUTPUT_CHANNEL,$output_PERC3,-1,-1,$NI_BUS_OFFSET + %Tile_to_Bus[$TILE_PERC2])
-		set_control_par_str(%output_id[$TILE_PERC2],$CONTROL_PAR_TEXT,get_menu_item_str(%output_id[$TILE_PERC2], $output_PERC3 + 1))
+		%channel_output[$TILE_PERC3] := $output_PERC3
+		set_engine_par($ENGINE_PAR_OUTPUT_CHANNEL,$output_PERC3,-1,-1,$NI_BUS_OFFSET + %Tile_to_Bus[$TILE_PERC3])
+		set_control_par_str(%output_id[$TILE_PERC3],$CONTROL_PAR_TEXT,get_menu_item_str(%output_id[$TILE_PERC3], $output_PERC3 + 1))
 	end on
 	on ui_control($output_TOM1)
 		%channel_output[$TILE_TOM1] := $output_TOM1
@@ -12891,7 +12966,7 @@ end on
 					while ($group_count < $AC_NUM_GROUPS)
 						pgs_set_key_val(AC_LOAD_PURGE_STATE, $group_count, %Ac_Group_PURGE_State[$group_count])
 						inc($group_count)
-						wait(1)   
+						wait(1)
 					end while
 					pgs_set_key_val(COMMAND, 0, 0)
 				{/AC_Global_PURGE_SYSTEM}
@@ -12992,11 +13067,19 @@ end on
 				{/AC_Global_PURGE_SYSTEM}
 			end if
 			
-			$tile_pointer := $tile_count
-			call update_SOURCE_Values
+			{$tile_pointer := $tile_count
+			call update_SOURCE_Values}
 
 			inc($tile_count)
 		end while
+
+		call update_SOURCE_Values
+
+		call update_AC_PURGE_state
+		call update_EL_PURGE_state
+
+		set_engine_par($ENGINE_PAR_SEND_EFFECT_BYPASS,get_control_par(%mute_id[$TILE_REV],$CONTROL_PAR_VALUE),-1,$REVERB_SLOT,0)
+
 		$reset_flag := 0
 		fade_in($ALL_EVENTS,5000)
 	end function
@@ -14222,85 +14305,18 @@ end on
 	    	end if
 		end on
 
-on listener
+{on listener
 	select ($NI_SIGNAL_TYPE)
 		case $NI_SIGNAL_TIMER_MS
 		if ($gui_update = 0)
 			$gui_update := 1
 			call tile_Select
 			call update_sound_preset_menu
-			$disp_tile_count := 0
-			while ($disp_tile_count < $NUM_TILES)
-				{$fx_pointer := $disp_tile_count}
-				if (%Tile_has_Mixer[$disp_tile_count] = $YES)
-					if ($disp_tile_count = $TILE_MASTER)
-						set_control_par_str (%mast_effects_control_id[$MAST_TRANS_ATTACK], $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_TR_ATTACK,-1,$TRANS1_SLOT, 1) & " %")
-						set_control_par_str (%mast_effects_control_id[$MAST_TRANS_RELEASE],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_TR_SUSTAIN,-1,$TRANS1_SLOT, 1) & " %")
-						set_control_par_str (%mast_effects_control_id[$MAST_COMP_THRES],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_THRESHOLD,-1,$COMP_SLOT, 1) & " dB")
-						set_control_par_str (%mast_effects_control_id[$MAST_COMP_ATTACK],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_ATTACK,-1,$COMP_SLOT, 1) & " ms")
-						set_control_par_str (%mast_effects_control_id[$MAST_COMP_RATIO],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_RATIO,-1,$COMP_SLOT, 1) & "")
-						set_control_par_str (%mast_effects_control_id[$MAST_COMP_MAKEUP],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_MAKEUP,-1,$COMP_SLOT, 1) & " dB")
-						set_control_par_str (%mast_effects_control_id[$MAST_SAT_GAIN],     $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SHAPE,-1,$SAT_SLOT, 1) & " %")
-						set_control_par_str (%mast_effects_control_id[$MAST_SAT_LEVEL],    $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SAT_SLOT, 1) & " dB")
-						set_control_par_str (%mast_effects_control_id[$MAST_EQ_LOW_FREQ],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_LF_FREQ,-1,$EQ1_SLOT, 1) & " Hz")
-						set_control_par_str (%mast_effects_control_id[$MAST_EQ_LOW_GAIN],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_LF_GAIN,-1,$EQ1_SLOT, 1) & " dB")
-						set_control_par_str (%mast_effects_control_id[$MAST_EQ_MID_FREQ],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HMF_FREQ,-1,$EQ1_SLOT, 1) & " Hz")
-						set_control_par_str (%mast_effects_control_id[$MAST_EQ_MID_GAIN],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HMF_GAIN,-1,$EQ1_SLOT, 1) & " dB")
-						set_control_par_str (%mast_effects_control_id[$MAST_EQ_HI_FREQ],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HF_FREQ,-1,$EQ1_SLOT, 1) & " Hz")
-						set_control_par_str (%mast_effects_control_id[$MAST_EQ_HI_GAIN],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HF_GAIN,-1,$EQ1_SLOT, 1) & " dB")
-						$vol_pointer := $disp_tile_count
-						set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SPREAD_SLOT,1) & " dB")
-						$pan_pointer  := $disp_tile_count
-						set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO,-1,$SPREAD_SLOT,1))
-						if ( $pan_MASTER = 1000000)
-							set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL, "Stereo")
-						end if
-					else
-						if ($disp_tile_count = $TILE_REV)
-							{$solo_pointer := $disp_tile_count
-							call tile_SOLO
-							$mute_pointer := $disp_tile_count
-							call tile_MUTE}
-							$vol_pointer := $disp_tile_count
-							set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEND_EFFECT_OUTPUT_GAIN,-1,$REVERB_SLOT,0) & " dB")
-						else 	
-							{all OTHER Tiles}
-							$vol_pointer  := $disp_tile_count
-							set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$vol_pointer]) & " dB")
-							
-							$pan_pointer  := $disp_tile_count
-							if ($pan_pointer = $TILE_OHS or $pan_pointer = $TILE_OHM or $pan_pointer = $TILE_ROOM)
-								if(%oh_stereo[$pan_pointer] # -1)
-									if(%oh_stereo[$pan_pointer] = 1)
-										{width}
-										set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO, -1, $SPREAD_SLOT, $NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
-										if ( $pan_OHS = 1000000)
-											set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL, "Stereo")
-										end if
-									else
-										{pan}
-										set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO_PAN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
-									end if
-								end if
-							else
-								set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO_PAN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
-							end if
-							{$solo_pointer := $disp_tile_count
-							call tile_SOLO}
-							$mute_pointer := $disp_tile_count
-							{call tile_MUTE}
-							set_control_par(%mute_id[$mute_pointer],$CONTROL_PAR_VALUE,get_control_par(%mute_id[$mute_pointer],$CONTROL_PAR_VALUE))
-							{reverb_send}
-							set_control_par_str (%effects_control_id[$RVB_SEND],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SENDLEVEL_0,-1,$SEND_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$disp_tile_count]) & " dB")
-						end if
-					end if
-				end if
-				inc($disp_tile_count)
-			end while
+			
 			change_listener_par($NI_SIGNAL_TIMER_MS,0)
 		end if
 	end select
-end on
+end on}
 
 on async_complete
 	if ($NI_ASYNC_ID = $load_ir_id)
@@ -14591,4 +14607,268 @@ on pgs_changed
 		case 7
 			$play_btn := pgs_get_key_val(PLAY_BUTTON, 0)
 	end select
+end on
+
+on persistence_changed
+	wait(1)   
+
+	$bus_index := 1
+	%master_fx_data[$MAST_TRANS_ATTACK]	:= get_engine_par($ENGINE_PAR_TR_ATTACK, -1, $TRANS1_SLOT, $bus_index)
+	%master_fx_data[$MAST_TRANS_RELEASE]:= get_engine_par($ENGINE_PAR_TR_SUSTAIN, -1, $TRANS1_SLOT, $bus_index)
+	%master_fx_data[$MAST_COMP_THRES]	:= get_engine_par($ENGINE_PAR_SCOMP_THRESHOLD,-1,$COMP_SLOT,$bus_index)
+	%master_fx_data[$MAST_COMP_ATTACK]	:= get_engine_par($ENGINE_PAR_SCOMP_ATTACK,-1,$COMP_SLOT,$bus_index)
+	%master_fx_data[$MAST_COMP_RATIO]	:= get_engine_par($ENGINE_PAR_SCOMP_RATIO,-1,$COMP_SLOT,$bus_index)
+	%master_fx_data[$MAST_COMP_MAKEUP]	:= get_engine_par($ENGINE_PAR_SCOMP_MAKEUP,-1,$COMP_SLOT,$bus_index)
+	%master_fx_data[$MAST_SAT_GAIN]		:= get_engine_par($ENGINE_PAR_SHAPE,-1,$SAT_SLOT,$bus_index)
+	%master_fx_data[$MAST_SAT_LEVEL]	:= get_engine_par($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SAT_SLOT,$bus_index)
+	%master_fx_data[$MAST_EQ_LOW_FREQ]	:= get_engine_par($ENGINE_PAR_SEQ_LF_FREQ,-1,$EQ1_SLOT,$bus_index)
+	%master_fx_data[$MAST_EQ_LOW_GAIN]	:= get_engine_par($ENGINE_PAR_SEQ_LF_GAIN,-1,$EQ1_SLOT,$bus_index)
+	%master_fx_data[$MAST_EQ_MID_FREQ]	:= get_engine_par($ENGINE_PAR_SEQ_HMF_FREQ,-1,$EQ1_SLOT,$bus_index)
+	%master_fx_data[$MAST_EQ_MID_GAIN]	:= get_engine_par($ENGINE_PAR_SEQ_HMF_GAIN,-1,$EQ1_SLOT,$bus_index)
+	%master_fx_data[$MAST_EQ_HI_FREQ]	:= get_engine_par($ENGINE_PAR_SEQ_HF_FREQ,-1,$EQ1_SLOT,$bus_index)
+	%master_fx_data[$MAST_EQ_HI_GAIN]	:= get_engine_par($ENGINE_PAR_SEQ_HF_GAIN,-1,$EQ1_SLOT,$bus_index)
+	%master_onoff_data[0] := (get_engine_par($ENGINE_PAR_EFFECT_BYPASS, -1, $TRANS1_SLOT, $bus_index) + 1) mod 2
+	%master_onoff_data[1] := (get_engine_par($ENGINE_PAR_EFFECT_BYPASS, -1, $COMP_SLOT, $bus_index) + 1) mod 2
+	%master_onoff_data[2] := (get_engine_par($ENGINE_PAR_EFFECT_BYPASS, -1, $SAT_SLOT, $bus_index) + 1) mod 2
+	%master_onoff_data[3] := (get_engine_par($ENGINE_PAR_EFFECT_BYPASS, -1, $EQ1_SLOT, $bus_index) + 1) mod 2
+	call update_MASTER_FX_Values
+
+	$bus_index := $NI_BUS_OFFSET + %Tile_to_Bus[$cur_tile]
+	%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $TRANS_ATTACK] := get_engine_par($ENGINE_PAR_TR_ATTACK,-1,$TRANS1_SLOT,$bus_index)
+	%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $TRANS_RELEASE] := get_engine_par($ENGINE_PAR_TR_SUSTAIN,-1,$TRANS1_SLOT,$bus_index)
+	%ingain[%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $COMP_AMOUNT]] := get_engine_par($ENGINE_PAR_FCOMP_INPUT,-1, $COMP_SLOT,$bus_index)
+	%outgain[%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $COMP_AMOUNT]] := get_engine_par($ENGINE_PAR_FCOMP_MAKEUP, -1 ,$COMP_SLOT,$bus_index)
+	%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $COMP_ATTACK] := get_engine_par($ENGINE_PAR_FCOMP_ATTACK,  -1, $COMP_SLOT,$bus_index)
+	%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $SAT_GAIN] := get_engine_par($ENGINE_PAR_SHAPE,-1,$SAT_SLOT,$bus_index)
+	%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $SAT_LEVEL] := get_engine_par($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SAT_SLOT,$bus_index)
+	%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $EQ_LOW_FREQ] := get_engine_par($ENGINE_PAR_SEQ_LF_FREQ,-1,$EQ1_SLOT,$bus_index)
+	%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $EQ_LOW_GAIN] := get_engine_par($ENGINE_PAR_SEQ_LF_GAIN,-1,$EQ1_SLOT,$bus_index)
+	%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $EQ_MID_FREQ] := get_engine_par($ENGINE_PAR_SEQ_HMF_FREQ,-1,$EQ1_SLOT,$bus_index)
+	%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $EQ_MID_GAIN] := get_engine_par($ENGINE_PAR_SEQ_HMF_GAIN,-1,$EQ1_SLOT,$bus_index)
+	%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $EQ_HI_FREQ] := get_engine_par($ENGINE_PAR_SEQ_HF_FREQ,-1,$EQ1_SLOT,$bus_index)
+	%fx_data[($cur_tile * $NUM_CONTROLS_FX) + $EQ_HI_GAIN] := get_engine_par($ENGINE_PAR_SEQ_HF_GAIN,-1,$EQ1_SLOT,$bus_index)
+	%onoff_data[($cur_tile * $NUM_CONTROLS_ONOFF) + 0] := (get_engine_par($ENGINE_PAR_EFFECT_BYPASS, -1, $TRANS1_SLOT, $bus_index) + 1) mod 2
+	%onoff_data[($cur_tile * $NUM_CONTROLS_ONOFF) + 1] := (get_engine_par($ENGINE_PAR_EFFECT_BYPASS, -1, $COMP_SLOT, $bus_index) + 1) mod 2
+	%onoff_data[($cur_tile * $NUM_CONTROLS_ONOFF) + 2] := (get_engine_par($ENGINE_PAR_EFFECT_BYPASS, -1, $SAT_SLOT, $bus_index) + 1) mod 2
+	%onoff_data[($cur_tile * $NUM_CONTROLS_ONOFF) + 3] := (get_engine_par($ENGINE_PAR_EFFECT_BYPASS, -1, $EQ1_SLOT, $bus_index) + 1) mod 2
+	call update_FX_Values
+
+	call update_SOURCE_Values
+	
+	call irload
+	call reverbpicupdate
+
+	pgs_set_key_val(COMMAND, 0, -1)
+	$tile_count := 0
+	while ($tile_count < $NUM_TILES)
+		select ($tile_count)
+			case $TILE_KICK
+				pgs_set_key_val(ACTIVE_KICK,  0, %Ac_Inst_Selection[$tile_count])
+				pgs_set_key_val(ELEC_ACTIVE_KICK,  0, %El_Inst_Selection[$tile_count])
+			case $TILE_SNARE
+				pgs_set_key_val(ACTIVE_SNARE, 0, %Ac_Inst_Selection[$tile_count])
+				pgs_set_key_val(ELEC_ACTIVE_SNARE, 0, %El_Inst_Selection[$tile_count])
+			case $TILE_HIHAT
+				pgs_set_key_val(ACTIVE_HIHAT, 0, %Ac_Inst_Selection[$tile_count])
+				pgs_set_key_val(ELEC_ACTIVE_HIHAT, 0, %El_Inst_Selection[$tile_count])
+			case $TILE_TOM1
+				pgs_set_key_val(ACTIVE_TOM1,  0, %Ac_Inst_Selection[$tile_count])
+				pgs_set_key_val(ELEC_ACTIVE_TOM1,  0, %El_Inst_Selection[$tile_count])
+			case $TILE_TOM2
+				pgs_set_key_val(ACTIVE_TOM2,  0, %Ac_Inst_Selection[$tile_count])
+				pgs_set_key_val(ELEC_ACTIVE_TOM2,  0, %El_Inst_Selection[$tile_count])
+			case $TILE_TOM3
+				pgs_set_key_val(ACTIVE_TOM3,  0, %Ac_Inst_Selection[$tile_count])
+				pgs_set_key_val(ELEC_ACTIVE_TOM3,  0, %El_Inst_Selection[$tile_count])
+			case $TILE_CYMB1
+				pgs_set_key_val(ACTIVE_CYMB1, 0, %Ac_Inst_Selection[$tile_count])
+			case $TILE_CYMB2
+				pgs_set_key_val(ACTIVE_CYMB2, 0, %Ac_Inst_Selection[$tile_count])
+			case $TILE_CYMB3
+				pgs_set_key_val(ACTIVE_CYMB3, 0, %Ac_Inst_Selection[$tile_count])
+			case $TILE_PERC1
+				pgs_set_key_val(ACTIVE_PERC1, 0, %Ac_Inst_Selection[$tile_count])
+			case $TILE_PERC2
+				pgs_set_key_val(ACTIVE_PERC2, 0, %Ac_Inst_Selection[$tile_count])
+			case $TILE_PERC3
+				pgs_set_key_val(ACTIVE_PERC3, 0, %Ac_Inst_Selection[$tile_count])
+			case $TILE_PERC4
+				pgs_set_key_val(ACTIVE_PERC4, 0, %Ac_Inst_Selection[$tile_count])
+			case $TILE_PERC5
+				pgs_set_key_val(ACTIVE_PERC5, 0, %Ac_Inst_Selection[$tile_count])
+		end select
+		inc($tile_count)
+	end while
+	
+	if (pgs_key_exists(PURGE_MODE))	
+		if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+			$group_count := 0
+		    while ($group_count < $AC_NUM_GROUPS)
+		        purge_group($group_count, %Ac_Group_PURGE_State[$group_count])
+		        inc($group_count)
+		        {wait(1)}
+		    end while
+	    	$group_count := 0
+	        while ($group_count < $EL_NUM_GROUPS)
+	            purge_group($group_count + $AC_NUM_GROUPS, %El_Group_PURGE_State[$group_count])
+	            inc($group_count)
+	            {wait(1)}
+	        end while
+		end if
+	end if
+
+	if($last_sound_preset < $MAX_SOUND_FACT_PRESETS)
+		set_control_par_str(%sound_preset_controls[10],$CONTROL_PAR_PICTURE,"header-preset-delete-btn-disabled")
+	end if
+
+	$tile_count := 0
+	while($tile_count < $NUM_TILES)
+		if (%Tile_has_Mixer[$tile_count] > 0)
+			if ($tile_count # $TILE_REV and $tile_count # $TILE_MASTER)
+				set_engine_par($ENGINE_PAR_OUTPUT_CHANNEL,%channel_output[$tile_count], -1, -1, $NI_BUS_OFFSET + %Tile_to_Bus[$tile_count])
+			end if
+		end if
+		inc($tile_count)
+	end while
+
+	$disp_tile_count := 0
+	while ($disp_tile_count < $NUM_TILES)
+		if (%Tile_has_Mixer[$disp_tile_count] = $YES)
+			if ($disp_tile_count = $TILE_MASTER)
+				set_control_par_str (%mast_effects_control_id[$MAST_TRANS_ATTACK], $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_TR_ATTACK,-1,$TRANS1_SLOT, 1) & " %")
+				set_control_par_str (%mast_effects_control_id[$MAST_TRANS_RELEASE],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_TR_SUSTAIN,-1,$TRANS1_SLOT, 1) & " %")
+				set_control_par_str (%mast_effects_control_id[$MAST_COMP_THRES],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_THRESHOLD,-1,$COMP_SLOT, 1) & " dB")
+				set_control_par_str (%mast_effects_control_id[$MAST_COMP_ATTACK],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_ATTACK,-1,$COMP_SLOT, 1) & " ms")
+				set_control_par_str (%mast_effects_control_id[$MAST_COMP_RATIO],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_RATIO,-1,$COMP_SLOT, 1) & "")
+				set_control_par_str (%mast_effects_control_id[$MAST_COMP_MAKEUP],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_MAKEUP,-1,$COMP_SLOT, 1) & " dB")
+				set_control_par_str (%mast_effects_control_id[$MAST_SAT_GAIN],     $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SHAPE,-1,$SAT_SLOT, 1) & " %")
+				set_control_par_str (%mast_effects_control_id[$MAST_SAT_LEVEL],    $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SAT_SLOT, 1) & " dB")
+				set_control_par_str (%mast_effects_control_id[$MAST_EQ_LOW_FREQ],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_LF_FREQ,-1,$EQ1_SLOT, 1) & " Hz")
+				set_control_par_str (%mast_effects_control_id[$MAST_EQ_LOW_GAIN],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_LF_GAIN,-1,$EQ1_SLOT, 1) & " dB")
+				set_control_par_str (%mast_effects_control_id[$MAST_EQ_MID_FREQ],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HMF_FREQ,-1,$EQ1_SLOT, 1) & " Hz")
+				set_control_par_str (%mast_effects_control_id[$MAST_EQ_MID_GAIN],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HMF_GAIN,-1,$EQ1_SLOT, 1) & " dB")
+				set_control_par_str (%mast_effects_control_id[$MAST_EQ_HI_FREQ],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HF_FREQ,-1,$EQ1_SLOT, 1) & " Hz")
+				set_control_par_str (%mast_effects_control_id[$MAST_EQ_HI_GAIN],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HF_GAIN,-1,$EQ1_SLOT, 1) & " dB")
+				$vol_pointer := $disp_tile_count
+				set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SPREAD_SLOT,1) & " dB")
+				$pan_pointer  := $disp_tile_count
+				set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO,-1,$SPREAD_SLOT,1))
+				if ( $pan_MASTER = 1000000)
+					set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL, "Stereo")
+				end if
+			else
+				if ($disp_tile_count = $TILE_REV)
+					$vol_pointer := $disp_tile_count
+					set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEND_EFFECT_OUTPUT_GAIN,-1,$REVERB_SLOT,0) & " dB")
+				else 	
+					$vol_pointer  := $disp_tile_count
+					set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$vol_pointer]) & " dB")
+					
+					$pan_pointer  := $disp_tile_count
+					if ($pan_pointer = $TILE_OHS or $pan_pointer = $TILE_OHM or $pan_pointer = $TILE_ROOM)
+						if(%oh_stereo[$pan_pointer] # -1)
+							if(%oh_stereo[$pan_pointer] = 1)
+								set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO, -1, $SPREAD_SLOT, $NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
+								if ( $pan_OHS = 1000000)
+									set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL, "Stereo")
+								end if
+							else
+								set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO_PAN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
+							end if
+						end if
+					else
+						set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO_PAN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
+					end if
+					$mute_pointer := $disp_tile_count
+					set_control_par(%mute_id[$mute_pointer],$CONTROL_PAR_VALUE,get_control_par(%mute_id[$mute_pointer],$CONTROL_PAR_VALUE))
+					set_control_par_str (%effects_control_id[$RVB_SEND],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SENDLEVEL_0,-1,$SEND_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$disp_tile_count]) & " dB")
+				end if
+			end if
+		end if
+		inc($disp_tile_count)
+	end while
+
+	set_control_par(%category_controls_id[01],$CONTROL_PAR_PICTURE_STATE,$category_mnu)
+
+	set_engine_par($ENGINE_PAR_SEND_EFFECT_BYPASS,get_control_par(%mute_id[$TILE_REV],$CONTROL_PAR_VALUE),-1,$REVERB_SLOT,0)
+
+	call tile_Select
+	call update_sound_preset_menu
+
+	pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(PRESET_DATA, 0, 0)
+		pgs_set_key_val(PRESET_DATA, 1, 0)
+		pgs_set_key_val(PRESET_DATA, 2, $last_sound_preset)
+		pgs_set_key_val(PRESET_DATA, 4, 0)
+		pgs_set_key_val(PRESET_DATA, 5, $Preset_Category)
+	pgs_set_key_val(COMMAND, 0, 1)
+
+	$tile_count := 0
+	while($tile_count < $NUM_TILES)
+		if (%Tile_has_Mixer[$tile_count] > 0)
+			if ($tile_count # $TILE_MASTER)
+				pgs_set_key_val(TILE_MUTE_STATE, $tile_count, %mute_state[$tile_count])
+			end if
+		end if
+		inc($tile_count)
+	end while
+
+	$z := 0
+	while ($z < 6)
+		pgs_set_key_val(MIC_VOICE_ALLOW, $z, %mic_balance_state[$z])	
+		inc($z)
+	end while
+
+	$z := 0
+	while ($z < 6)
+		pgs_set_key_val(ELEC_DELAY, $z, %src_data[(%Inst_to_Tile_remap[$z] * 15) + $SRC_EL_DELAY])	
+		inc($z)
+	end while
+
+	pgs_set_key_val(ELEC_DELAY_OPN_HH, 0, $opn_HH_pgs_value)
+
+	pgs_set_key_val(COMMAND, 0, -1)
+	$x := 0
+	while ($x < $AC_NUM_GROUPS)
+		pgs_set_key_val(AC_LOAD_PURGE_STATE, $x, %Ac_Group_PURGE_State[$x])
+		inc($x)
+	end while
+
+	$x := 0
+	while ($x < $EL_NUM_GROUPS)
+		pgs_set_key_val(EL_LOAD_PURGE_STATE, $x, %El_Group_PURGE_State[$x])
+		inc($x)
+	end while
+	pgs_set_key_val(COMMAND, 0, 0)
+
+	pgs_set_key_val(ACTIVE_KICK,  0, %Ac_Inst_Selection[$TILE_KICK])
+	pgs_set_key_val(ACTIVE_SNARE, 0, %Ac_Inst_Selection[$TILE_SNARE])
+	pgs_set_key_val(ACTIVE_HIHAT, 0, %Ac_Inst_Selection[$TILE_HIHAT])
+	pgs_set_key_val(ACTIVE_TOM1,  0, %Ac_Inst_Selection[$TILE_TOM1])
+	pgs_set_key_val(ACTIVE_TOM2,  0, %Ac_Inst_Selection[$TILE_TOM2])
+	pgs_set_key_val(ACTIVE_TOM3,  0, %Ac_Inst_Selection[$TILE_TOM3])
+	pgs_set_key_val(ACTIVE_CYMB1, 0, %Ac_Inst_Selection[$TILE_CYMB1])
+	pgs_set_key_val(ACTIVE_CYMB2, 0, %Ac_Inst_Selection[$TILE_CYMB2])
+	pgs_set_key_val(ACTIVE_CYMB3, 0, %Ac_Inst_Selection[$TILE_CYMB3])
+	pgs_set_key_val(ACTIVE_PERC1, 0, %Ac_Inst_Selection[$TILE_PERC1])
+	pgs_set_key_val(ACTIVE_PERC2, 0, %Ac_Inst_Selection[$TILE_PERC2])
+	pgs_set_key_val(ACTIVE_PERC3, 0, %Ac_Inst_Selection[$TILE_PERC3])
+	pgs_set_key_val(ACTIVE_PERC4, 0, %Ac_Inst_Selection[$TILE_PERC4])
+	pgs_set_key_val(ACTIVE_PERC5, 0, %Ac_Inst_Selection[$TILE_PERC5])
+
+	$a := 0
+	while ($a < num_elements(%save_kit_voice_allow))
+		pgs_set_key_val(KIT_VOICE_ALLOW, $a, %save_kit_voice_allow[$a])
+		inc($a)
+	end while
+
+	pgs_set_key_val(ELEC_ACTIVE_KICK,  0, %El_Inst_Selection[$TILE_KICK])
+	pgs_set_key_val(ELEC_ACTIVE_SNARE, 0, %El_Inst_Selection[$TILE_SNARE])
+	pgs_set_key_val(ELEC_ACTIVE_HIHAT, 0, %El_Inst_Selection[$TILE_HIHAT])
+	pgs_set_key_val(ELEC_ACTIVE_TOM1,  0, %El_Inst_Selection[$TILE_TOM1])
+	pgs_set_key_val(ELEC_ACTIVE_TOM2,  0, %El_Inst_Selection[$TILE_TOM2])
+	pgs_set_key_val(ELEC_ACTIVE_TOM3,  0, %El_Inst_Selection[$TILE_TOM3])
+
+	pgs_set_key_val(PRESET_DATA, 5, $Preset_Category)
+
 end on

@@ -1,5 +1,5 @@
 {***********************************************
-Drum Lab
+Drum Lab 1.2
 Voice Control
 Author: Native Instruments
 Written by: Thanos Kazakos, Dinos Vallianatos
