@@ -43,6 +43,7 @@ on init
 	declare $tile_count
 	declare $tile_count_2
 	declare $tile_count_3
+	declare $disp_tile_count
 	declare $group_count
 	declare $mic_count
 	declare $auto_count
@@ -547,6 +548,7 @@ on init
 	declare $load_ir_id
 
 	declare $fx_pointer
+	declare $d_fx_pointer
 	declare $src_pointer
 	declare $mic_pointer
 	declare $vol_pointer
@@ -654,7 +656,7 @@ on init
 	!source_help[07] := "Ac. Decay: Adjusts the Decay time of the selected instrument's volume envelope"
 	!source_help[08] := "El. Tune: Use this control to shift the pitch of the selected electronic layer of that instrument. Option-Click changes the balance for ALL tiles with an electronic Layer."
 	!source_help[09] := "El. Filter: Turn this control left to activate and adjust the cutof frequency of the Low Pass Filter or right to adjust the frequency of the High Pass Filter"
-	!source_help[10] := "El. Triger Delay: This control adjust the delay time of the electronic layer."
+	!source_help[10] := "El. Triger Offset: This control adjust the delay time of the electronic layer."
 	!source_help[11] := "El. Attack: Adjusts the Attack time of the selected electronic layer's volume envelope"
 	!source_help[12] := "El. Hold: Adjusts the Hold time of the selected electronic layer's volume envelope"
 	!source_help[13] := "El. Hold: Adjusts the Decay time of the selected electronic layer's volume envelope"
@@ -11205,7 +11207,7 @@ end on
 					    		end if
 					    	end if
 				    end select
-				end on
+				end on 
 
 {Effects Callbacks}
 	function store_FX_data
@@ -11219,7 +11221,7 @@ end on
 		set_engine_par($ENGINE_PAR_TR_ATTACK,$trans_attack_sld,-1,$TRANS1_SLOT,$bus_index)
 		$fx_pointer := $TRANS_ATTACK
 		call store_FX_data
-		set_control_par_str (%lbl_fx_id[$TRANS_ATTACK],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%effects_control_id[$TRANS_ATTACK],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_TR_ATTACK,-1,$TRANS1_SLOT,$bus_index) & " %")
 		set_text ($lbl_trans_attack,get_engine_par_disp($ENGINE_PAR_TR_ATTACK,-1,$TRANS1_SLOT,$bus_index) & " %")
 		%lbl_fx_last_time[$TRANS_ATTACK] := $ENGINE_UPTIME
@@ -11426,7 +11428,7 @@ end on
 		set_engine_par($ENGINE_PAR_SENDLEVEL_0,$send_value,-1,$SEND_SLOT,$bus_index)
 		$fx_pointer := $RVB_SEND
 		call store_FX_data
-		set_control_par_str (%lbl_fx_id[$RVB_SEND],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%effects_control_id[$RVB_SEND],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SENDLEVEL_0,-1,$SEND_SLOT,$bus_index) & " dB")
 		set_text ($lbl_reverb_send,get_engine_par_disp($ENGINE_PAR_SENDLEVEL_0,-1,$SEND_SLOT,$bus_index) & " dB")
 		%lbl_fx_last_time[$RVB_SEND] := $ENGINE_UPTIME
@@ -11470,7 +11472,7 @@ end on
 		set_engine_par($ENGINE_PAR_TR_ATTACK,$mast_trans_attack_sld,-1,$TRANS1_SLOT,$bus_index)
 		$fx_pointer := $MAST_TRANS_ATTACK
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_TR_ATTACK,-1,$TRANS1_SLOT,$bus_index) & " %")
 		set_text ($lbl_mast_trans_attack,get_engine_par_disp($ENGINE_PAR_TR_ATTACK,-1,$TRANS1_SLOT,$bus_index) & " %")
 		%lbl_mast_fx_last_time[$MAST_TRANS_ATTACK] := $ENGINE_UPTIME
@@ -11488,7 +11490,7 @@ end on
 		set_engine_par($ENGINE_PAR_TR_SUSTAIN,$mast_trans_sustain_sld,-1,$TRANS1_SLOT,$bus_index)
 		$fx_pointer := $MAST_TRANS_RELEASE
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_TR_SUSTAIN,-1,$TRANS1_SLOT,$bus_index) & " %")
 		set_text ($lbl_mast_trans_sustain,get_engine_par_disp($ENGINE_PAR_TR_SUSTAIN,-1,$TRANS1_SLOT,$bus_index) & " %")
 		%lbl_mast_fx_last_time[$MAST_TRANS_RELEASE] := $ENGINE_UPTIME
@@ -11507,7 +11509,7 @@ end on
 		set_engine_par($ENGINE_PAR_SCOMP_THRESHOLD,$mast_comp_thres_sld,-1,$COMP_SLOT,$bus_index)
 		$fx_pointer := $MAST_COMP_THRES
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SCOMP_THRESHOLD,-1,$COMP_SLOT,$bus_index) & " dB")
 		set_text ($lbl_mast_comp_thres,get_engine_par_disp($ENGINE_PAR_SCOMP_THRESHOLD,-1,$COMP_SLOT,$bus_index) & " dB")
 		%lbl_mast_fx_last_time[$MAST_COMP_THRES] := $ENGINE_UPTIME
@@ -11525,7 +11527,7 @@ end on
 		set_engine_par($ENGINE_PAR_SCOMP_ATTACK,$mast_comp_attack_sld,-1,$COMP_SLOT,$bus_index)
 		$fx_pointer := $MAST_COMP_ATTACK
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SCOMP_ATTACK,-1,$COMP_SLOT,$bus_index) & " ms")
 		set_text ($lbl_mast_comp_attack,get_engine_par_disp($ENGINE_PAR_SCOMP_ATTACK,-1,$COMP_SLOT,$bus_index) & " ms")
 		%lbl_mast_fx_last_time[$MAST_COMP_ATTACK] := $ENGINE_UPTIME
@@ -11543,7 +11545,7 @@ end on
 		set_engine_par($ENGINE_PAR_SCOMP_RATIO,$mast_comp_ratio_sld,-1,$COMP_SLOT,$bus_index)
 		$fx_pointer := $MAST_COMP_RATIO
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SCOMP_RATIO,-1,$COMP_SLOT,$bus_index) & "")
 		set_text ($lbl_mast_comp_ratio,get_engine_par_disp($ENGINE_PAR_SCOMP_RATIO,-1,$COMP_SLOT,$bus_index) & "")
 		%lbl_mast_fx_last_time[$MAST_COMP_RATIO] := $ENGINE_UPTIME
@@ -11561,7 +11563,7 @@ end on
 		set_engine_par($ENGINE_PAR_SCOMP_MAKEUP,$mast_comp_makeup_sld,-1,$COMP_SLOT,$bus_index)
 		$fx_pointer := $MAST_COMP_MAKEUP
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SCOMP_MAKEUP,-1,$COMP_SLOT,$bus_index) & " dB")
 		set_text ($lbl_mast_comp_makeup,get_engine_par_disp($ENGINE_PAR_SCOMP_MAKEUP,-1,$COMP_SLOT,$bus_index) & " dB")
 		%lbl_mast_fx_last_time[$MAST_COMP_MAKEUP] := $ENGINE_UPTIME
@@ -11579,7 +11581,7 @@ end on
 		set_engine_par($ENGINE_PAR_SHAPE,$mast_sat_gain_sld,-1,$SAT_SLOT,$bus_index)
 		$fx_pointer := $MAST_SAT_GAIN
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SHAPE,-1,$SAT_SLOT,$bus_index) & " %")
 		set_text ($lbl_mast_sat_gain,get_engine_par_disp($ENGINE_PAR_SHAPE,-1,$SAT_SLOT,$bus_index) & " %")
 		%lbl_mast_fx_last_time[$MAST_SAT_GAIN] := $ENGINE_UPTIME
@@ -11597,7 +11599,7 @@ end on
 		set_engine_par($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,$mast_sat_level_sld,-1,$SAT_SLOT,$bus_index)
 		$fx_pointer := $MAST_SAT_LEVEL
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SAT_SLOT,$bus_index) & " dB")
 		set_text ($lbl_mast_sat_level,get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SAT_SLOT,$bus_index) & " dB")
 		%lbl_mast_fx_last_time[$MAST_SAT_LEVEL] := $ENGINE_UPTIME
@@ -11615,7 +11617,7 @@ end on
 		set_engine_par($ENGINE_PAR_SEQ_LF_FREQ,$mast_eq_lf_freq_sld,-1,$EQ1_SLOT,$bus_index)
 		$fx_pointer := $MAST_EQ_LOW_FREQ
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SEQ_LF_FREQ,-1,$EQ1_SLOT,$bus_index) & " Hz")
 		set_text ($lbl_mast_eq_lf_freq,get_engine_par_disp($ENGINE_PAR_SEQ_LF_FREQ,-1,$EQ1_SLOT,$bus_index) & " Hz")
 		%lbl_mast_fx_last_time[$MAST_EQ_LOW_FREQ] := $ENGINE_UPTIME
@@ -11633,7 +11635,7 @@ end on
 		set_engine_par($ENGINE_PAR_SEQ_LF_GAIN,$mast_eq_lf_db_sld,-1,$EQ1_SLOT,$bus_index)
 		$fx_pointer := $MAST_EQ_LOW_GAIN
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SEQ_LF_GAIN,-1,$EQ1_SLOT,$bus_index) & " dB")
 		set_text ($lbl_mast_eq_lf_db,get_engine_par_disp($ENGINE_PAR_SEQ_LF_GAIN,-1,$EQ1_SLOT,$bus_index) & " dB")
 		%lbl_mast_fx_last_time[$MAST_EQ_LOW_GAIN] := $ENGINE_UPTIME
@@ -11651,7 +11653,7 @@ end on
 		set_engine_par($ENGINE_PAR_SEQ_HMF_FREQ,$mast_eq_hmf_freq_sld,-1,$EQ1_SLOT,$bus_index)
 		$fx_pointer := $MAST_EQ_MID_FREQ
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SEQ_HMF_FREQ,-1,$EQ1_SLOT,$bus_index) & " Hz")
 		set_text ($lbl_mast_eq_hmf_freq,get_engine_par_disp($ENGINE_PAR_SEQ_HMF_FREQ,-1,$EQ1_SLOT,$bus_index) & " Hz")
 		%lbl_mast_fx_last_time[$MAST_EQ_MID_FREQ] := $ENGINE_UPTIME
@@ -11669,7 +11671,7 @@ end on
 		set_engine_par($ENGINE_PAR_SEQ_HMF_GAIN,$mast_eq_hmf_db_sld,-1,$EQ1_SLOT,$bus_index)
 		$fx_pointer := $MAST_EQ_MID_GAIN
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SEQ_HMF_GAIN,-1,$EQ1_SLOT,$bus_index) & " dB")
 		set_text ($lbl_mast_eq_hmf_db,get_engine_par_disp($ENGINE_PAR_SEQ_HMF_GAIN,-1,$EQ1_SLOT,$bus_index) & " dB")
 		%lbl_mast_fx_last_time[$MAST_EQ_MID_GAIN] := $ENGINE_UPTIME
@@ -11687,7 +11689,7 @@ end on
 		set_engine_par($ENGINE_PAR_SEQ_HF_FREQ,$mast_eq_hf_freq_sld,-1,$EQ1_SLOT,$bus_index)
 		$fx_pointer := $MAST_EQ_HI_FREQ
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SEQ_HF_FREQ,-1,$EQ1_SLOT,$bus_index) & " Hz")
 		set_text ($lbl_mast_eq_hf_freq,get_engine_par_disp($ENGINE_PAR_SEQ_HF_FREQ,-1,$EQ1_SLOT,$bus_index) & " Hz")
 		%lbl_mast_fx_last_time[$MAST_EQ_HI_FREQ] := $ENGINE_UPTIME
@@ -11705,7 +11707,7 @@ end on
 		set_engine_par($ENGINE_PAR_SEQ_HF_GAIN,$mast_eq_hf_db_sld,-1,$EQ1_SLOT,$bus_index)
 		$fx_pointer := $MAST_EQ_HI_GAIN
 		call store_master_FX_data
-		set_control_par_str (%lbl_mast_fx_id[$fx_pointer],$CONTROL_PAR_LABEL,...
+		set_control_par_str (%mast_effects_control_id[$fx_pointer],$CONTROL_PAR_LABEL,...
                       get_engine_par_disp($ENGINE_PAR_SEQ_HF_GAIN,-1,$EQ1_SLOT,$bus_index) & " dB")
 		set_text ($lbl_mast_eq_hf_db,get_engine_par_disp($ENGINE_PAR_SEQ_HF_GAIN,-1,$EQ1_SLOT,$bus_index) & " dB")
 		%lbl_mast_fx_last_time[$MAST_EQ_HI_GAIN] := $ENGINE_UPTIME
@@ -11842,19 +11844,19 @@ end on
 				{reverb}
 				$vol_value := (%wurzel_zweidrittel[$vol_value]*$cur_volume_verb)/1000
 				set_engine_par($ENGINE_PAR_SEND_EFFECT_OUTPUT_GAIN,$vol_value,-1,$REVERB_SLOT,0)
-				set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEND_EFFECT_OUTPUT_GAIN,-1,$REVERB_SLOT,0) & "dB")	
+				set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEND_EFFECT_OUTPUT_GAIN,-1,$REVERB_SLOT,0) & " dB")
 			else
 				if ($vol_pointer = $TILE_MASTER)
 					{master}
 					set_engine_par($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,(%wurzel_zweidrittel[$vol_value]*$cur_volume)/1000,-1,$SPREAD_SLOT,1)
-					set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SPREAD_SLOT,1) & "dB")		
+					set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SPREAD_SLOT,1) & " dB")
 				end if
 			end if
 		else
 			{channel/kit mic}
 			$vol_value := %solo_state[$vol_pointer]*%mute_state[$vol_pointer]*((%wurzel_zweidrittel[$vol_value]*$cur_volume)/1000)
 			set_engine_par($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,$vol_value,-1, $SPREAD_SLOT, $NI_BUS_OFFSET + %Tile_to_Bus[$vol_pointer])
-			set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_VOLUME,-1,-1,$NI_BUS_OFFSET + %Tile_to_Bus[$vol_pointer]) & "dB")	
+			set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$vol_pointer]) & " dB")
 		end if
 	end function
 
@@ -11997,13 +11999,19 @@ end on
 			{master}
 			set_engine_par($ENGINE_PAR_STEREO,$pan_value/2,-1,$SPREAD_SLOT,1)
 			set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO,-1,$SPREAD_SLOT,1))
+			if ( $pan_MASTER = 1000000)
+				set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL, "Stereo")
+			end if
 		else
 			if ($pan_pointer = $TILE_OHS or $pan_pointer = $TILE_OHM or $pan_pointer = $TILE_ROOM)
 				if(%oh_stereo[$pan_pointer] # -1)
 					if(%oh_stereo[$pan_pointer] = 1)
 						{width}
 						set_engine_par($ENGINE_PAR_STEREO,$pan_value/2,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer])
-						set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO, -1, $SPREAD_SLOT, $NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
+						set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_STEREO, -1, $SPREAD_SLOT, $NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
+						if ( $pan_OHS = 1000000)
+							set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL, "Stereo")
+						end if
 					else
 						{pan}
 						set_engine_par($ENGINE_PAR_STEREO_PAN,$pan_value,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer])
@@ -12012,7 +12020,7 @@ end on
 				end if
 			else
 				set_engine_par($ENGINE_PAR_STEREO_PAN,$pan_value,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer])
-				set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_PAN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
+				set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO_PAN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
 			end if
 		end if
 	end function
@@ -12111,7 +12119,8 @@ end on
 		else
 			$vol_value := %solo_state[$mute_pointer]*%mute_state[$mute_pointer]*((%wurzel_zweidrittel[$vol_value]*$cur_volume)/1000)
 			set_engine_par($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,$vol_value,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$mute_pointer])
-			{set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_VOLUME,-1,-1,$NI_BUS_OFFSET + %Tile_to_Bus[$vol_pointer]) & "dB")}	
+			{set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_VOLUME,-1,-1,$NI_BUS_OFFSET + %Tile_to_Bus[$vol_pointer]) & "dB")}
+			{set_control_par_str(%mute_id[$mute_pointer],$CONTROL_PAR_LABEL, get_control_par(%mute_id[$vol_pointer],$CONTROL_PAR_VALUE))}
 			pgs_set_key_val(COMMAND,0,-1)
 			pgs_set_key_val(TILE_MUTE_STATE,$mute_pointer,%mute_state[$mute_pointer])
 		end if
@@ -12164,7 +12173,7 @@ end on
 	on ui_control ($mute_REV)
 		$mute_pointer := $TILE_REV
 		call tile_MUTE
-	end on 
+	end on  
 
 {SOLO Callbacks}
 	function tile_SOLO
@@ -13036,7 +13045,7 @@ end on
 		{Master has no mute/solo but has L<->R swap button AND MASTER FX CHAIN}
 		{REVERB has Volume, Solo MUTE and ir_value & ir_category but NO FX}
 		
-		message("last preset: " & $last_sound_preset & " - active: " & $active_preset & " - Preset Bank: " & $Preset_Category)
+		{message("last preset: " & $last_sound_preset & " - active: " & $active_preset & " - Preset Bank: " & $Preset_Category)}
 
 		if ($active_preset < $MAX_SOUND_FACT_PRESETS)
 			{FACTORY Settings}
@@ -14220,6 +14229,74 @@ on listener
 			$gui_update := 1
 			call tile_Select
 			call update_sound_preset_menu
+			$disp_tile_count := 0
+			while ($disp_tile_count < $NUM_TILES)
+				{$fx_pointer := $disp_tile_count}
+				if (%Tile_has_Mixer[$disp_tile_count] = $YES)
+					if ($disp_tile_count = $TILE_MASTER)
+						set_control_par_str (%mast_effects_control_id[$MAST_TRANS_ATTACK], $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_TR_ATTACK,-1,$TRANS1_SLOT, 1) & " %")
+						set_control_par_str (%mast_effects_control_id[$MAST_TRANS_RELEASE],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_TR_SUSTAIN,-1,$TRANS1_SLOT, 1) & " %")
+						set_control_par_str (%mast_effects_control_id[$MAST_COMP_THRES],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_THRESHOLD,-1,$COMP_SLOT, 1) & " dB")
+						set_control_par_str (%mast_effects_control_id[$MAST_COMP_ATTACK],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_ATTACK,-1,$COMP_SLOT, 1) & " ms")
+						set_control_par_str (%mast_effects_control_id[$MAST_COMP_RATIO],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_RATIO,-1,$COMP_SLOT, 1) & "")
+						set_control_par_str (%mast_effects_control_id[$MAST_COMP_MAKEUP],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SCOMP_MAKEUP,-1,$COMP_SLOT, 1) & " dB")
+						set_control_par_str (%mast_effects_control_id[$MAST_SAT_GAIN],     $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SHAPE,-1,$SAT_SLOT, 1) & " %")
+						set_control_par_str (%mast_effects_control_id[$MAST_SAT_LEVEL],    $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SAT_SLOT, 1) & " dB")
+						set_control_par_str (%mast_effects_control_id[$MAST_EQ_LOW_FREQ],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_LF_FREQ,-1,$EQ1_SLOT, 1) & " Hz")
+						set_control_par_str (%mast_effects_control_id[$MAST_EQ_LOW_GAIN],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_LF_GAIN,-1,$EQ1_SLOT, 1) & " dB")
+						set_control_par_str (%mast_effects_control_id[$MAST_EQ_MID_FREQ],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HMF_FREQ,-1,$EQ1_SLOT, 1) & " Hz")
+						set_control_par_str (%mast_effects_control_id[$MAST_EQ_MID_GAIN],  $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HMF_GAIN,-1,$EQ1_SLOT, 1) & " dB")
+						set_control_par_str (%mast_effects_control_id[$MAST_EQ_HI_FREQ],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HF_FREQ,-1,$EQ1_SLOT, 1) & " Hz")
+						set_control_par_str (%mast_effects_control_id[$MAST_EQ_HI_GAIN],   $CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEQ_HF_GAIN,-1,$EQ1_SLOT, 1) & " dB")
+						$vol_pointer := $disp_tile_count
+						set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SPREAD_SLOT,1) & " dB")
+						$pan_pointer  := $disp_tile_count
+						set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO,-1,$SPREAD_SLOT,1))
+						if ( $pan_MASTER = 1000000)
+							set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL, "Stereo")
+						end if
+					else
+						if ($disp_tile_count = $TILE_REV)
+							{$solo_pointer := $disp_tile_count
+							call tile_SOLO
+							$mute_pointer := $disp_tile_count
+							call tile_MUTE}
+							$vol_pointer := $disp_tile_count
+							set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SEND_EFFECT_OUTPUT_GAIN,-1,$REVERB_SLOT,0) & " dB")
+						else 	
+							{all OTHER Tiles}
+							$vol_pointer  := $disp_tile_count
+							set_control_par_str(%volfader_id[$vol_pointer],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_INSERT_EFFECT_OUTPUT_GAIN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$vol_pointer]) & " dB")
+							
+							$pan_pointer  := $disp_tile_count
+							if ($pan_pointer = $TILE_OHS or $pan_pointer = $TILE_OHM or $pan_pointer = $TILE_ROOM)
+								if(%oh_stereo[$pan_pointer] # -1)
+									if(%oh_stereo[$pan_pointer] = 1)
+										{width}
+										set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO, -1, $SPREAD_SLOT, $NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
+										if ( $pan_OHS = 1000000)
+											set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL, "Stereo")
+										end if
+									else
+										{pan}
+										set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO_PAN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
+									end if
+								end if
+							else
+								set_control_par_str(%pan_id[$pan_pointer],$CONTROL_PAR_LABEL,get_engine_par_disp($ENGINE_PAR_STEREO_PAN,-1,$SPREAD_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$pan_pointer]))
+							end if
+							{$solo_pointer := $disp_tile_count
+							call tile_SOLO}
+							$mute_pointer := $disp_tile_count
+							{call tile_MUTE}
+							set_control_par(%mute_id[$mute_pointer],$CONTROL_PAR_VALUE,get_control_par(%mute_id[$mute_pointer],$CONTROL_PAR_VALUE))
+							{reverb_send}
+							set_control_par_str (%effects_control_id[$RVB_SEND],$CONTROL_PAR_LABEL, get_engine_par_disp($ENGINE_PAR_SENDLEVEL_0,-1,$SEND_SLOT,$NI_BUS_OFFSET + %Tile_to_Bus[$disp_tile_count]) & " dB")
+						end if
+					end if
+				end if
+				inc($disp_tile_count)
+			end while
 			change_listener_par($NI_SIGNAL_TIMER_MS,0)
 		end if
 	end select

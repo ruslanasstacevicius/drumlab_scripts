@@ -18,6 +18,7 @@ on init
 	declare $debug
 	declare $playing_flag
 	declare $key_counter
+	declare $n_counter
 	
 	set_control_par_str($INST_ICON_ID, $CONTROL_PAR_PICTURE, "NID_instrument_icon")
 	
@@ -76,6 +77,7 @@ on init
 
 	declare const $MIDI_PTTRN_LOW	:= 12
 	declare const $MIDI_PTTRN_HIGH	:= 23
+	declare const $IS_KEYSWITCH		:= 12
 	declare const $MAX_NUM_PATTERNS	:= 12
 
 	declare $init_flag := 1
@@ -2016,6 +2018,14 @@ function suspend_playback
 	$play_btn := 0
 	$processing_flag := 1
 	note_off($ALL_EVENTS)
+
+	$n_counter := 0
+	while ($n_counter < 127)
+		set_key_pressed($n_counter, 0)
+		note_off($ALL_EVENTS)
+		wait(1000)   
+		inc($n_counter)
+	end while
 	
 	while ($play_flag = 1)
 		wait(1000)
@@ -2215,7 +2225,7 @@ function visualize_MIDI
 				set_control_par(%midi_lbl_id[$mf_event_instrument * 32 + $mf_event_position], $CONTROL_PAR_POS_X, 25 + $mf_event_position_ticks)
 				set_control_par(%midi_lbl_id[$mf_event_instrument * 32 + $mf_event_position], $CONTROL_PAR_PICTURE_STATE,$mf_event_velocity)
 				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_0, $processed_flag_value)
-				message("")
+				{message("")}
 				inc($count_1)
 			end if
 			mf_get_next($TRACK_IDX)
@@ -3560,8 +3570,9 @@ on note
 
 				mf_set_export_area(@file_name, -1,-1,0,0)
 
+				{color active pattern}
 				$count_1 := 0
-				while ($count_1 < $MAX_NUM_PATTERNS) {color active pattern}
+				while ($count_1 < $MAX_NUM_PATTERNS) 
 					if (%key_has_pattern[$count_1] = $YES)
 						set_key_color($count_1 + 12, $KEY_COLOR_GREEN)
 					end if
@@ -3601,6 +3612,7 @@ on note
 	end if
 
 	if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH) and get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) = -1)
+		set_event_par($EVENT_ID,$EVENT_PAR_1,$IS_KEYSWITCH)
 		$play_btn := 1
 		$playing_flag := 1
 		inc($key_counter)
@@ -3611,8 +3623,12 @@ on release
 	if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH) and get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) = -1)
 		dec($key_counter)
 	end if
-	if (($NI_TRANSPORT_RUNNING = 0 and $playing_flag = 1) or $key_counter < 1)
+
+	if (($NI_TRANSPORT_RUNNING = 0 and $playing_flag = 1) or ($key_counter < 1 and get_event_par($EVENT_ID,$EVENT_PAR_1) = $IS_KEYSWITCH) )
 		$play_btn := 0
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(PLAY_BUTTON, 0, $play_btn)
+		pgs_set_key_val(COMMAND, 0,  7)
 	else
 		$playing_flag := 0
 	end if

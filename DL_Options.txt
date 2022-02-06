@@ -3,7 +3,7 @@ Drum Lab
 Options Page
 Author: Native Instruments
 Written by: Thanos Kazakos
-Modified: August 7th, 2013
+Modified: June 11th, 2014
 *************************************************}
 
 on init
@@ -15,6 +15,9 @@ on init
 	set_ui_height_px(540)
 	set_skin_offset(1266)
 	set_script_title("Options")
+
+	declare polyphonic $played_key
+	set_key_pressed_support(1)
 
 	declare const $LISTENER_RESOL := 2		{in times per beat}	
 	set_listener($NI_SIGNAL_TIMER_BEAT, $LISTENER_RESOL)
@@ -31,6 +34,8 @@ on init
 
 	declare const $MIDI_PTTRN_LOW	:= 12
 	declare const $MIDI_PTTRN_HIGH	:= 23
+	declare const $IS_KEYSWITCH		:= 12
+	set_keyrange($MIDI_PTTRN_LOW, $MIDI_PTTRN_HIGH, "Groove Pattern Select")
 
 	declare const $NUM_TILES					:= 19
 	declare const $NUM_INSTRUMENTS				:= 20
@@ -141,6 +146,28 @@ on init
 	!INSTRUMENT_NAMES[$PERC3_ID] := "PERC C"
 	!INSTRUMENT_NAMES[$PERC4_ID] := "PERC D"
 	!INSTRUMENT_NAMES[$PERC5_ID] := "PERC E"
+
+	declare !inst_visual_names[20]
+	!inst_visual_names[$KICK_ID]  := "Kick"
+	!inst_visual_names[$SNARE_ID] := "Snare"
+	!inst_visual_names[$HH_ID]    := "Hihat"
+	!inst_visual_names[$TOM1_ID]  := "Tom A"
+	!inst_visual_names[$TOM2_ID]  := "Tom B"
+	!inst_visual_names[$TOM3_ID]  := "Tom C"
+	!inst_visual_names[$TOM4_ID]  := ""
+	!inst_visual_names[$TOM5_ID]  := ""
+	!inst_visual_names[$CYMB1_ID] := "Crash LO"
+	!inst_visual_names[$CYMB2_ID] := "Crash HI"
+	!inst_visual_names[$CYMB3_ID] := "Ride"
+	!inst_visual_names[$CYMB4_ID] := ""
+	!inst_visual_names[$CYMB5_ID] := ""
+	!inst_visual_names[$CYMB6_ID] := ""
+	!inst_visual_names[$CYMB7_ID] := ""
+	!inst_visual_names[$PERC1_ID] := "Perc A"
+	!inst_visual_names[$PERC2_ID] := "Perc B"
+	!inst_visual_names[$PERC3_ID] := "Perc C"
+	!inst_visual_names[$PERC4_ID] := "Perc D"
+	!inst_visual_names[$PERC5_ID] := "Perc E"
 	
 	{constants that are to be set per kit}
 	declare %KEY_USED[128] := (1)	{which notes are used for this kit: 0 -> note is NOT used
@@ -516,14 +543,14 @@ on init
 	declare const $CYMB7_CHOKE := 98
 	
 	{Instruments per note}
-	declare %note_instruments[128] := (-1) {which key belongs to which instrument}
+	declare %which_key_to_which_inst[128] := (-1) {which key belongs to which instrument}
 	$count_1 := 0
 	$count_2 := 0
 	while ($count_1 < %AC_INSTRUMENT_OFFSET[$END_ID])
 		if ($count_1 >= %AC_INSTRUMENT_OFFSET[$count_2 + 1])
 			inc($count_2)
 		end if
-		%note_instruments[$count_1] := $count_2
+		%which_key_to_which_inst[$count_1] := $count_2
 		inc($count_1)
 	end while
 	{/shared across Options, Kit & Voice Control scripts}
@@ -2214,6 +2241,170 @@ on init
 			!ARTICULATION_NAMES[121] := "HIT 1"
 			!ARTICULATION_NAMES[122] := "HIT 2"
 
+	declare !artic_visual_name[126]
+		{Kick}
+			!artic_visual_name[0] := "Dampened"
+			!artic_visual_name[1] := "Half Open"
+			!artic_visual_name[2] := ""
+			!artic_visual_name[3] := ""			
+		
+		{Snare}
+			!artic_visual_name[4] := "Center L/R"
+			!artic_visual_name[5] := "Center L"
+			!artic_visual_name[6] := "Center R"
+			!artic_visual_name[7] := "Halfway L/R"
+			!artic_visual_name[8] := "Halfway L"
+			!artic_visual_name[9] := "Halfway R"
+			!artic_visual_name[10] := "Rimshot"
+			!artic_visual_name[11] := "Sidestick"
+			!artic_visual_name[12] := "Kang"
+			!artic_visual_name[13] := "Shot"
+			!artic_visual_name[14] := "Muted"
+			!artic_visual_name[15] := ""
+			!artic_visual_name[16] := ""
+			!artic_visual_name[17] := ""
+			!artic_visual_name[18] := ""
+			!artic_visual_name[19] := ""
+		
+		{Hihat}
+			!artic_visual_name[20] := ""
+			!artic_visual_name[21] := ""
+			!artic_visual_name[22] := ""
+			!artic_visual_name[23] := "Closed Tip L/R"
+			!artic_visual_name[24] := ""
+			!artic_visual_name[25] := ""
+			!artic_visual_name[26] := "Closed Shank L/R"
+			!artic_visual_name[27] := ""
+			!artic_visual_name[28] := ""
+			!artic_visual_name[29] := "Closed Pedal"
+			!artic_visual_name[30] := "Open Pedal"
+			!artic_visual_name[31] := "Open Control"
+			!artic_visual_name[32] := ""
+			!artic_visual_name[33] := "Open Half"
+			!artic_visual_name[34] := ""
+			!artic_visual_name[35] := "Open Full"
+			!artic_visual_name[36] := ""
+			!artic_visual_name[37] := ""
+			!artic_visual_name[38] := ""
+			!artic_visual_name[39] := ""
+
+		{Tom 1}
+			!artic_visual_name[40] := "Center L/R"
+			!artic_visual_name[41] := ""
+			!artic_visual_name[42] := ""
+			!artic_visual_name[43] := ""
+			!artic_visual_name[44] := ""
+			!artic_visual_name[45] := ""			
+			!artic_visual_name[46] := ""			
+			
+		{Tom 2}
+			!artic_visual_name[47] := "Center L/R"
+			!artic_visual_name[48] := ""
+			!artic_visual_name[49] := ""
+			!artic_visual_name[50] := ""
+			!artic_visual_name[51] := ""
+			!artic_visual_name[52] := ""	
+			!artic_visual_name[53] := ""	
+			
+		{Tom 3}
+			!artic_visual_name[54] := "Center L/R"
+			!artic_visual_name[55] := ""
+			!artic_visual_name[56] := ""
+			!artic_visual_name[57] := ""
+			!artic_visual_name[58] := ""
+			!artic_visual_name[59] := ""			
+			!artic_visual_name[60] := ""			
+			
+		{Tom 4}
+			!artic_visual_name[61] := "Center L/R"
+			!artic_visual_name[62] := "Center L"
+			!artic_visual_name[63] := "Center R"
+			!artic_visual_name[64] := "Rimshot"
+			!artic_visual_name[65] := "Rim ONLY"
+			!artic_visual_name[66] := "Brush TAP"			
+			!artic_visual_name[67] := "Brush DIG"			
+
+		{Tom 5}
+			!artic_visual_name[68] := "Center L/R"
+			!artic_visual_name[69] := "Center L"
+			!artic_visual_name[70] := "Center R"
+			!artic_visual_name[71] := "Rimshot"
+			!artic_visual_name[72] := "Rim ONLY"
+			!artic_visual_name[73] := "Brush TAP"  	
+			!artic_visual_name[74] := "Brush DIG"  	
+			
+		{Cymbal 1}
+			!artic_visual_name[75] := "Tip"
+			!artic_visual_name[76] := "Edge"
+			!artic_visual_name[77] := "Bell"
+			!artic_visual_name[78] := "Choke"
+			!artic_visual_name[79] := "Brush"
+			
+		{Cymbal 2}
+			!artic_visual_name[80] := "Tip"
+			!artic_visual_name[81] := "Edge"
+			!artic_visual_name[82] := ""
+			!artic_visual_name[83] := ""
+			!artic_visual_name[84] := ""
+			
+		{Cymbal 3}
+			!artic_visual_name[85] := "Bell"
+			!artic_visual_name[86] := "Tip"
+			!artic_visual_name[87] := ""
+			!artic_visual_name[88] := ""
+			!artic_visual_name[89] := ""
+			!artic_visual_name[90] := ""
+			
+		{Cymbal 4}
+			!artic_visual_name[91] := "Edge"
+			!artic_visual_name[92] := "Tip"
+			!artic_visual_name[93] := "Bell"
+			!artic_visual_name[94] := "Choke"
+			
+		{Cymbal 5}
+			!artic_visual_name[95] := "Edge"
+			!artic_visual_name[96] := "Tip"
+			!artic_visual_name[97] := "Bell"
+			!artic_visual_name[98] := "Choke"
+			
+		{Cymbal 6}
+			!artic_visual_name[99] := "Edge"
+			!artic_visual_name[100] := "Tip"
+			!artic_visual_name[101] := "Bell"
+			!artic_visual_name[102] := "Choke"
+			
+		{Cymbal 7}
+			!artic_visual_name[103] := "Edge"
+			!artic_visual_name[104] := "Tip"
+			!artic_visual_name[105] := "Bell"
+			!artic_visual_name[106] := "Choke"
+			
+		{constants that are to be set per kit}
+		{Perc A - }
+			!artic_visual_name[107] := "Hit 1"
+			!artic_visual_name[108] := "Hit 2"
+			!artic_visual_name[109] := ""
+			!artic_visual_name[110] := ""
+		
+		{Perc B - }
+			!artic_visual_name[111] := "Hit 1"
+			!artic_visual_name[112] := "Hit 2"
+			!artic_visual_name[113] := ""
+			!artic_visual_name[114] := ""
+			
+		{Perc C - }
+			!artic_visual_name[115] := "Hit 1"	
+			!artic_visual_name[116] := "Hit 2"
+			!artic_visual_name[117] := ""
+
+		{Perc D - }	
+			!artic_visual_name[118] := "Hit 1"
+			!artic_visual_name[119] := ""
+			!artic_visual_name[120] := ""
+		{Perc 5 - Chopper}
+			!artic_visual_name[121] := "Hit 1"
+			!artic_visual_name[122] := "Hit 2"
+
 		declare !PERC_A_ARTIC_NAMES[8]
 				!PERC_A_ARTIC_NAMES[0] := "LO CONGA"
 				!PERC_A_ARTIC_NAMES[1] := "Hi CONGA"
@@ -2525,7 +2716,7 @@ on init
 	add_menu_item($instruments_mnu, "(None) ", -1)
 
 	if (%current_mapping_data[$active_key_sld] > -1 and %KEY_USED[%current_mapping_data[$active_key_sld]] = 1)
-		$instruments_mnu := %note_instruments[%current_mapping_data[$active_key_sld]]
+		$instruments_mnu := %which_key_to_which_inst[%current_mapping_data[$active_key_sld]]
 		set_control_par_str(%mapping_id[1], $CONTROL_PAR_PICTURE, !INSTRUMENT_PICS[$instruments_mnu])
 		select ($instruments_mnu)
 			case $KICK_ID
@@ -2578,8 +2769,8 @@ on init
 		$articulations_mnu := -1
 		inc($count_1)
 	else
-		$count_2 := %AC_INSTRUMENT_OFFSET[%note_instruments[%current_mapping_data[$active_key_sld]]]
-		while ($count_2 < %AC_INSTRUMENT_OFFSET[%note_instruments[%current_mapping_data[$active_key_sld]] + 1])
+		$count_2 := %AC_INSTRUMENT_OFFSET[%which_key_to_which_inst[%current_mapping_data[$active_key_sld]]]
+		while ($count_2 < %AC_INSTRUMENT_OFFSET[%which_key_to_which_inst[%current_mapping_data[$active_key_sld]] + 1])
 			if (%KEY_USED[$count_2] > 0)
 				set_menu_item_str(%mapping_id[2], $count_1, !ARTICULATION_NAMES[$count_2] & @ART_MENU_ALIGNMENT_HELPER)
 				set_menu_item_value(%mapping_id[2], $count_1, $count_2)
@@ -3660,6 +3851,7 @@ on init
 
 set_listener($NI_SIGNAL_TIMER_MS,100)
 $init_flag := 0
+set_key_pressed_support(1)
 end on
 {/init}
 
@@ -3822,39 +4014,45 @@ end on
 	function key_coloring
 		$count_1 := 0
 		while ($count_1 < 128)
-			if (not in_range($count_1,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH))
-				if (%current_mapping_data[$count_1] > -1 and %KEY_USED[%current_mapping_data[$count_1]] # 0)
-					select (%note_instruments[%current_mapping_data[$count_1]])
-						case $KICK_ID
-							set_key_color($count_1, $KEY_COLOR_BLACK)
-						case $SNARE_ID
-							set_key_color($count_1, $KEY_COLOR_RED)
-						case $HH_ID
-							set_key_color($count_1, $KEY_COLOR_GREEN)
-						case $TOM1_ID to $TOM4_ID
-							set_key_color($count_1, $KEY_COLOR_BLUE)
-						case $CYMB1_ID to $CYMB7_ID
-							set_key_color($count_1, $KEY_COLOR_YELLOW)
-						case $PERC1_ID to $PERC5_ID
-							set_key_color($count_1, $KEY_COLOR_CYAN)
-					end select
-				else
-					set_key_color($count_1, $KEY_COLOR_WHITE)
-				end if
+			if (%current_mapping_data[$count_1] > -1 and %KEY_USED[%current_mapping_data[$count_1]] # 0)
+				select (%which_key_to_which_inst[%current_mapping_data[$count_1]])
+					case $KICK_ID
+						set_key_color($count_1, $KEY_COLOR_RED)
+					case $SNARE_ID
+						set_key_color($count_1, $KEY_COLOR_WARM_YELLOW)
+					case $HH_ID
+						set_key_color($count_1, $KEY_COLOR_CYAN)
+					case $TOM1_ID to $TOM4_ID
+						set_key_color($count_1, $KEY_COLOR_ORANGE)
+					case $CYMB1_ID to $CYMB7_ID
+						set_key_color($count_1, $KEY_COLOR_MINT)
+					case $PERC1_ID to $PERC5_ID
+						set_key_color($count_1, $KEY_COLOR_ORANGE)
+				end select
+				$instruments_mnu := %which_key_to_which_inst[%current_mapping_data[$count_1]]
+				set_key_name($count_1, !inst_visual_names[$instruments_mnu] & " " & !artic_visual_name[%FACTORY_MAPPING[$current_mapping_preset_mnu * 128 + $count_1]])
 			else
-				if (pgs_get_key_val(LOADED_MIDI, $count_1 - 12) = 1)
-					set_key_color($count_1, $KEY_COLOR_GREEN)
-				else
-					set_key_color($count_1, $KEY_COLOR_BLACK)
-				end if
+				set_key_color($count_1, $KEY_COLOR_INACTIVE)
+				set_key_name($count_1, "")
 			end if
 			inc($count_1)
-		end while	
+		end while
+
+		$count_1 := $MIDI_PTTRN_LOW
+		while ($count_1 < $MIDI_PTTRN_HIGH)
+			if (pgs_get_key_val(LOADED_MIDI, $count_1 - 12) = 1)
+				set_key_color($count_1, $KEY_COLOR_RED)
+			else
+				set_key_color($count_1, $KEY_COLOR_PLUM)
+			end if
+			inc($count_1)
+		end while
+
 	end function
 
 	function update_mapping_editor_gui
 		if (%current_mapping_data[$active_key_sld] > -1 and %KEY_USED[%current_mapping_data[$active_key_sld]] = 1)
-			$instruments_mnu := %note_instruments[%current_mapping_data[$active_key_sld]]
+			$instruments_mnu := %which_key_to_which_inst[%current_mapping_data[$active_key_sld]]
 			set_control_par_str(%mapping_id[1], $CONTROL_PAR_PICTURE, !INSTRUMENT_PICS[$instruments_mnu])
 			select ($instruments_mnu)
 				case $KICK_ID
@@ -3899,8 +4097,8 @@ end on
 			$articulations_mnu := -1
 			inc($count_1)
 		else
-			$count_2 := %AC_INSTRUMENT_OFFSET[%note_instruments[%current_mapping_data[$active_key_sld]]]
-			while ($count_2 < %AC_INSTRUMENT_OFFSET[%note_instruments[%current_mapping_data[$active_key_sld]] + 1])
+			$count_2 := %AC_INSTRUMENT_OFFSET[%which_key_to_which_inst[%current_mapping_data[$active_key_sld]]]
+			while ($count_2 < %AC_INSTRUMENT_OFFSET[%which_key_to_which_inst[%current_mapping_data[$active_key_sld]] + 1])
 				if (%KEY_USED[$count_2] > 0)
 					set_menu_item_str(%mapping_id[2], $count_1, !ARTICULATION_NAMES[$count_2] & @ART_MENU_ALIGNMENT_HELPER)
 					set_menu_item_value(%mapping_id[2], $count_1, $count_2)
@@ -5756,6 +5954,13 @@ end on
 on note
 	$cur_note := $EVENT_NOTE
 
+	$played_key := $EVENT_NOTE
+	set_key_pressed($played_key, 1)
+
+	if (%current_mapping_data[$cur_note] > -1)
+		$instruments_mnu := %which_key_to_which_inst[%current_mapping_data[$cur_note]]
+	end if
+
 	{Select By MIDI Keyboard Only - NOT from the MIDI file playing}
 	if($cur_note # $last_note)
 		if (get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) # 0 and $NI_TRANSPORT_RUNNING # 1)
@@ -5819,6 +6024,8 @@ on note
 		end if
 
 		if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH) and get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) = -1)
+			set_event_par($EVENT_ID,$EVENT_PAR_1,$IS_KEYSWITCH)
+			{message("")}
 			$play := 1
 			$playing_flag := 1
 			pgs_set_key_val(COMMAND, 0, -1)
@@ -5826,8 +6033,8 @@ on note
 			pgs_set_key_val(COMMAND, 0,  7)
 			inc($key_counter)
 		end if
-
 	end if
+	
 	{Mapping}
 	if (%current_mapping_data[$EVENT_NOTE] = -1 or %KEY_USED[%current_mapping_data[$EVENT_NOTE]] = 0)
 		ignore_event($EVENT_ID)
@@ -5835,6 +6042,11 @@ on note
 	else
 		change_note($EVENT_ID, %current_mapping_data[$EVENT_NOTE])
 	end if
+
+	{message("EVENT_NOTE: " & $EVENT_NOTE & " cur_note: " & $cur_note & " - inverse FACT cur_mapping_data[$cur_note] is " & %inverse_mapping_data[%FACTORY_MAPPING[$current_mapping_preset_mnu * 128 + $cur_note]] & "   ***   " & get_key_name(%inverse_mapping_data[%FACTORY_MAPPING[$current_mapping_preset_mnu * 128 + $cur_note]]) & " *** Note Played: " & %inverse_mapping_data[%FACTORY_MAPPING[$current_mapping_preset_mnu * 128 + $cur_note]] & ...
+		" " & "Instrument: " & !INSTRUMENT_NAMES[$instruments_mnu]& " *** Articulation: " & !ARTICULATION_NAMES[%FACTORY_MAPPING[$current_mapping_preset_mnu * 128 + $cur_note]])}
+	{message( get_key_name(%inverse_mapping_data[%FACTORY_MAPPING[$current_mapping_preset_mnu * 128 + $cur_note]]) & " *** Note Played: " & %inverse_mapping_data[%FACTORY_MAPPING[$current_mapping_preset_mnu * 128 + $cur_note]] & ...
+			" " & "Instrument: " & !INSTRUMENT_NAMES[$instruments_mnu]& " *** Articulation: " & !ARTICULATION_NAMES[%FACTORY_MAPPING[$current_mapping_preset_mnu * 128 + $cur_note]])}
 	
 	{Velocity Curve & Range}
 	change_velo($EVENT_ID, %table[$cur_note * 128 + $EVENT_VELOCITY])
@@ -5844,6 +6056,8 @@ on release
 	if ($limit_down_flag = 1 or $limit_up_flag = 1)
 		exit
 	end if
+
+	{set_key_pressed($played_key, 0)}
 
 	if (get_event_par($EVENT_ID,$EVENT_PAR_SOURCE) = $CURRENT_SCRIPT_SLOT)
 		if ($direction = $RIGHT) {Keyboard ->RIGHT, Octave DOWN}
@@ -5992,27 +6206,32 @@ on release
 			{after slide illusion reposition to original position}
 			$kb_count_1 := 0
 			while ($kb_count_1 < $NUM_kb_NOTES)
-				set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_POS_X,           %kb_CONTROL_PAR[00 + ($kb_count_1 * 07)] + $KB_X_POS)
+				set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_POS_X, %kb_CONTROL_PAR[00 + ($kb_count_1 * 07)] + $KB_X_POS)
 			inc($kb_count_1)
 			end while
 
 			call label_octaves
 
 		end if
+
+	else
+		set_key_pressed($played_key, 0)
 	end if
 
 	if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH) and get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) = -1)
 		dec($key_counter)
 	end if
 
-	if (($NI_TRANSPORT_RUNNING = 0 and $playing_flag = 1) or $key_counter < 1)
-		$play := 0
+	if (($NI_TRANSPORT_RUNNING = 0 and $playing_flag = 1) or ($key_counter < 1 and get_event_par($EVENT_ID,$EVENT_PAR_1) = $IS_KEYSWITCH))
+		$play := 1
 		pgs_set_key_val(COMMAND, 0, -1)
 		pgs_set_key_val(PLAY_BUTTON, 0, $play)
 		pgs_set_key_val(COMMAND, 0,  7)
 	else
 		$playing_flag := 0
 	end if
+
+
 end on
 
 on pgs_changed
