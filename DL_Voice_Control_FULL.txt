@@ -1,0 +1,3364 @@
+{***********************************************
+Drum Lab
+Voice Control
+Author: Native Instruments
+Written by: Thanos Kazakos, Dinos Vallianatos
+Modified: August 7th, 2013
+*************************************************}
+
+on init
+{general variables & Constants}
+	message("")
+	set_script_title("Voice Engine")
+	{set_ui_height_px(480)
+	make_perfview
+	set_skin_offset(3000)}
+	
+	declare $played_note
+		
+	declare $event_cursor
+	declare $temp
+	declare $choke_flag
+	declare $choke_time
+	declare $choke_edge
+	declare $message_time
+	declare $cur_note
+	declare $cur_velo
+	declare $new_Ac_velo
+	declare $table_new_Ac_velo
+	declare $new_El_velo
+	declare $table_new_El_velo
+	declare $active_inst
+	declare $count
+	declare $ac_x1
+	declare $ac_y1
+	declare $ac_x2
+	declare $ac_y2
+	declare $el_x1
+	declare $el_y1
+	declare $el_x2
+	declare $el_y2
+	declare $b
+	declare $x
+	declare $y
+	declare $z
+	declare polyphonic $articulation_offset
+	declare polyphonic $elec_delay
+	declare $Ac_loaded_inst
+	declare $El_loaded_inst
+
+	{Sementics}
+	declare const $YES		  :=  1
+	declare const $NO		  :=  0
+	declare const $ON		  :=  1
+	declare const $OFF		  :=  0
+	declare const $PRESSED	  :=  1
+	declare const $NULL		  := -1
+	declare const $FILTER_ON  :=  0
+    declare const $FILTER_OFF :=  1
+
+    declare const $AC_NUM_GROUPS := 252
+    declare const $EL_NUM_GROUPS := 120
+
+    declare const $OP_HH_ID := 20		{as the only instrument that should be separated in two voice groups is the hh,
+													a new ID is introduced for this script}
+
+	declare const $SOUND_DESIGN_CONTROLS_VISIBLE := $NO
+
+    declare %Ac_Group_PURGE_State[$AC_NUM_GROUPS]
+    declare %El_Group_PURGE_State[$EL_NUM_GROUPS]
+
+	{helper variables}
+	declare $count_1
+	declare $count_2
+	declare $count_3
+	declare $count_4
+	declare $debug
+	{/helper variables}
+	
+	{debug}
+	declare ui_label $debug_monitor (1,16)
+	set_text($debug_monitor,"")
+	set_control_par(get_ui_id($debug_monitor),$CONTROL_PAR_WIDTH,240)
+	set_control_par(get_ui_id($debug_monitor),$CONTROL_PAR_HEIGHT,470)
+	set_control_par(get_ui_id($debug_monitor),$CONTROL_PAR_POS_X,345)
+	set_control_par(get_ui_id($debug_monitor),$CONTROL_PAR_POS_Y,1)
+	{/debug}
+
+{Velocity Curves
+	--------------------------
+	{The number of the row is the Note Number,
+	
+	meaning of columns:
+	#1: Point 1 Input Value
+	#2: Point 1 Output Value
+	#3: Point 2 Input Value
+	#4: Point 2 Output Value
+	#5: Point 3 Input Value
+	#6: Point 4 Output Value}
+
+	declare const $AC_NUM_LOADED_INST	:= 10
+	declare const $AC_NUM_ART			:= 128
+	declare const $EL_NUM_LOADED_INST	:= 20
+	declare const $EL_NUM_ART			:= 60
+	declare const $CURV_POINTS			:= 6
+	declare const $INPUT_1_VAL			:= 0
+	declare const $OUTPUT_1_VAL			:= 1
+	declare const $INPUT_2_VAL			:= 2
+	declare const $OUTPUT_2_VAL			:= 3
+	declare const $INPUT_3_VAL			:= 4
+	declare const $OUTPUT_3_VAL			:= 5
+
+	declare %AC_note_curve[$AC_NUM_LOADED_INST * $AC_NUM_ART * $CURV_POINTS]
+	make_persistent(%AC_note_curve)
+	declare %EL_note_curve[$EL_NUM_LOADED_INST * $AC_NUM_ART * $CURV_POINTS]
+	make_persistent(%EL_note_curve)
+
+	{init Curve Arrays}		{%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL]}
+	$x := 0
+	while ($x < $AC_NUM_LOADED_INST)
+		$y := 0
+		while ($y < $AC_NUM_ART)
+			%AC_note_curve[($x * $AC_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 0] := 32
+			%AC_note_curve[($x * $AC_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 1] := 32
+			%AC_note_curve[($x * $AC_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 2] := 64
+			%AC_note_curve[($x * $AC_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 3] := 64
+			%AC_note_curve[($x * $AC_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 4] := 96
+			%AC_note_curve[($x * $AC_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 5] := 96
+			inc($y)
+		end while
+		inc($x)
+	end while
+
+	$x := 0
+	while ($x < $EL_NUM_LOADED_INST)
+		$y := 0
+		while ($y < $EL_NUM_ART)
+			%EL_note_curve[($x * $EL_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 0] := 32
+			%EL_note_curve[($x * $EL_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 1] := 32
+			%EL_note_curve[($x * $EL_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 2] := 64
+			%EL_note_curve[($x * $EL_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 3] := 64
+			%EL_note_curve[($x * $EL_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 4] := 96
+			%EL_note_curve[($x * $EL_NUM_ART * $CURV_POINTS) + ($y * $CURV_POINTS) + 5] := 96
+			inc($y)
+		end while
+		inc($x)
+	end while
+
+
+	{/Velocity Curves}
+	
+{!!!VELOCITY CURVE ADJUSTMENTS PART1!!!}
+		{set_ui_height_px(300)}
+				
+		declare ui_knob $ac_point_1_in (1, 127, 1)
+		declare ui_knob $ac_point_1_out (1, 127, 1)
+		declare ui_knob $ac_point_2_in (1, 127, 1)
+		declare ui_knob $ac_point_2_out (1, 127, 1)
+		declare ui_knob $ac_point_3_in (1, 127, 1)
+		declare ui_knob $ac_point_3_out (1, 127, 1)
+		
+		set_text($ac_point_1_in, "X 1")
+		set_text($ac_point_1_out, "Y 1")
+		set_text($ac_point_2_in, "X 2")
+		set_text($ac_point_2_out, "Y 2")
+		set_text($ac_point_3_in, "X 3")
+		set_text($ac_point_3_out, "Y 3")
+		
+		move_control_px($ac_point_1_in, 70, 72)
+		move_control_px($ac_point_1_out, 70, 31)
+		move_control_px($ac_point_2_in, 161, 72)
+		move_control_px($ac_point_2_out, 161, 31)
+		move_control_px($ac_point_3_in, 253, 72)
+		move_control_px($ac_point_3_out, 253, 31)
+		
+		declare ui_switch $Ac_Reset
+		move_control_px($Ac_Reset, 252, 215)
+		
+		declare ui_table %ac_table[128] (1,3,127)
+		set_control_par(get_ui_id(%ac_table), $CONTROL_PAR_WIDTH, 271)
+		set_control_par(get_ui_id(%ac_table), $CONTROL_PAR_HEIGHT, 96)
+		move_control_px(%ac_table, 70, 113)
+		
+		declare ui_value_edit $note (0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+		move_control_px($note, 70, 215)	
+
+		declare ui_value_edit $note_num(0,127,1)
+		move_control_px($note_num, 70, 235)	
+
+		declare ui_label $Ac_active_instrument_lbl(1,1)
+
+		declare ui_knob $el_point_1_in (1, 127, 1)
+		declare ui_knob $el_point_1_out (1, 127, 1)
+		declare ui_knob $el_point_2_in (1, 127, 1)
+		declare ui_knob $el_point_2_out (1, 127, 1)
+		declare ui_knob $el_point_3_in (1, 127, 1)
+		declare ui_knob $el_point_3_out (1, 127, 1)
+
+		set_text($el_point_1_in, "X 1")
+		set_text($el_point_1_out, "Y 1")
+		set_text($el_point_2_in, "X 2")
+		set_text($el_point_2_out, "Y 2")
+		set_text($el_point_3_in, "X 3")
+		set_text($el_point_3_out, "Y 3")
+
+		move_control_px($el_point_1_in, 70, 302)
+		move_control_px($el_point_1_out, 70, 261)
+		move_control_px($el_point_2_in, 161, 302)
+		move_control_px($el_point_2_out, 161, 261)
+		move_control_px($el_point_3_in, 253, 302)
+		move_control_px($el_point_3_out, 253, 261)
+
+		declare ui_switch $el_Reset
+		move_control_px($el_Reset, 252, 445)
+
+		declare ui_table %el_table[128] (1,3,127)
+		set_control_par(get_ui_id(%el_table), $CONTROL_PAR_WIDTH, 271)
+		set_control_par(get_ui_id(%el_table), $CONTROL_PAR_HEIGHT, 96)
+		move_control_px(%el_table, 70, 343)
+
+		declare ui_label $El_active_instrument_lbl(1,1)
+		
+		declare %sd_controls_ui_id[21]
+		%sd_controls_ui_id[00] := get_ui_id($ac_point_1_in)
+		%sd_controls_ui_id[01] := get_ui_id($ac_point_1_out)
+		%sd_controls_ui_id[02] := get_ui_id($ac_point_2_in)
+		%sd_controls_ui_id[03] := get_ui_id($ac_point_2_out)
+		%sd_controls_ui_id[04] := get_ui_id($ac_point_3_in)
+		%sd_controls_ui_id[05] := get_ui_id($ac_point_3_out)
+		%sd_controls_ui_id[06] := get_ui_id($Ac_Reset)
+		%sd_controls_ui_id[07] := get_ui_id(%ac_table)
+		%sd_controls_ui_id[08] := get_ui_id($note)
+		%sd_controls_ui_id[09] := get_ui_id($note_num)
+		%sd_controls_ui_id[10] := get_ui_id($Ac_active_instrument_lbl)
+		%sd_controls_ui_id[11] := get_ui_id($el_point_1_in)
+		%sd_controls_ui_id[12] := get_ui_id($el_point_1_out)
+		%sd_controls_ui_id[13] := get_ui_id($el_point_2_in)
+		%sd_controls_ui_id[14] := get_ui_id($el_point_2_out)
+		%sd_controls_ui_id[15] := get_ui_id($el_point_3_in)
+		%sd_controls_ui_id[16] := get_ui_id($el_point_3_out)
+		%sd_controls_ui_id[17] := get_ui_id($el_Reset)
+		%sd_controls_ui_id[18] := get_ui_id(%el_table)
+		%sd_controls_ui_id[19] := get_ui_id($El_active_instrument_lbl)
+		%sd_controls_ui_id[20] := get_ui_id($debug_monitor)
+		
+		if ($SOUND_DESIGN_CONTROLS_VISIBLE = $YES)
+			$count_1 := 0
+			while ($count_1 < num_elements(%sd_controls_ui_id) )
+				set_control_par(%sd_controls_ui_id[$count_1], $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+				inc($count_1)
+			end while
+			set_ui_height_px(480)
+			{make_perfview}
+			set_skin_offset(3000)
+		else
+			$count_1 := 0
+			while ($count_1 < num_elements(%sd_controls_ui_id) )
+				set_control_par(%sd_controls_ui_id[$count_1], $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+				inc($count_1)
+			end while
+			set_ui_height_px(50)
+		end if		
+
+		$count_1 := 0
+		while ($count_1 < num_elements(%sd_controls_ui_id) )
+			select ($count)
+				case 0 to 1
+					set_control_par(%sd_controls_ui_id[$count], $CONTROL_PAR_DEFAULT_VALUE, 32)
+				case 2 to 3
+					set_control_par(%sd_controls_ui_id[$count], $CONTROL_PAR_DEFAULT_VALUE, 64)
+				case 4 to 5
+					set_control_par(%sd_controls_ui_id[$count], $CONTROL_PAR_DEFAULT_VALUE, 96)
+				case 11 to 12
+					set_control_par(%sd_controls_ui_id[$count], $CONTROL_PAR_DEFAULT_VALUE, 32)
+				case 13 to 14
+					set_control_par(%sd_controls_ui_id[$count], $CONTROL_PAR_DEFAULT_VALUE, 64)
+				case 15 to 16
+					set_control_par(%sd_controls_ui_id[$count], $CONTROL_PAR_DEFAULT_VALUE, 96)
+			end select
+			inc($count_1)
+		end while
+
+		set_control_par(%sd_controls_ui_id[10],$CONTROL_PAR_POS_X,161)
+		set_control_par(%sd_controls_ui_id[10],$CONTROL_PAR_POS_Y,235)
+		set_control_par(%sd_controls_ui_id[10],$CONTROL_PAR_WIDTH,178)
+		set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,"Ac. Instrument Loaded:  Press key")
+
+		set_control_par(%sd_controls_ui_id[19],$CONTROL_PAR_POS_X,70)
+		set_control_par(%sd_controls_ui_id[19],$CONTROL_PAR_POS_Y,447)
+		set_control_par(%sd_controls_ui_id[19],$CONTROL_PAR_WIDTH,178)
+		set_control_par_str(%sd_controls_ui_id[19],$CONTROL_PAR_TEXT,"El. Instrument Loaded:  Press key")
+
+	{!!!END TESTING PART1!!!
+	
+{shared across Options, Kit & Voice Control scripts}
+	declare const $NUM_TILES		 := 19
+	declare const $NUM_INSTRUMENTS	 := 20
+	declare const $MAX_NUM_TOTAL_ART := 126
+	declare const $MAX_NUM_GROUPS	 := 372
+	
+	declare const $KICK_ID := 0
+	declare const $SNARE_ID := 1
+	declare const $HH_ID := 2
+	declare const $TOM1_ID := 3
+	declare const $TOM2_ID := 4
+	declare const $TOM3_ID := 5
+	declare const $TOM4_ID := 6
+	declare const $TOM5_ID := 7
+	declare const $CYMB1_ID := 8
+	declare const $CYMB2_ID := 9
+	declare const $CYMB3_ID := 10
+	declare const $CYMB4_ID := 11
+	declare const $CYMB5_ID := 12
+	declare const $CYMB6_ID := 13
+	declare const $CYMB7_ID := 14
+	declare const $PERC1_ID := 15
+	declare const $PERC2_ID := 16
+	declare const $PERC3_ID := 17
+	declare const $PERC4_ID := 18
+	declare const $PERC5_ID := 19
+	declare const $END_ID := 20
+
+	declare const $TILE_OHS		:= 00
+	declare const $TILE_OHM		:= 01
+	declare const $TILE_ROOM	:= 02
+	declare const $TILE_REV		:= 03
+	declare const $TILE_PERC1	:= 04
+	declare const $TILE_PERC2	:= 05
+	declare const $TILE_PERC3	:= 06
+	declare const $TILE_TOM1	:= 07
+	declare const $TILE_TOM2	:= 08
+	declare const $TILE_TOM3	:= 09
+	declare const $TILE_CYMB1	:= 10
+	declare const $TILE_MASTER	:= 11
+	declare const $TILE_PERC4	:= 12
+	declare const $TILE_HIHAT	:= 13
+	declare const $TILE_SNARE	:= 14
+	declare const $TILE_KICK	:= 15
+	declare const $TILE_CYMB2	:= 16
+	declare const $TILE_PERC5	:= 17
+	declare const $TILE_CYMB3	:= 18
+	
+	declare !INSTRUMENT_NAMES[20]
+	!INSTRUMENT_NAMES[$KICK_ID]  := "KICK"
+	!INSTRUMENT_NAMES[$SNARE_ID] := "SNARE"
+	!INSTRUMENT_NAMES[$HH_ID]    := "HIHAT"
+	!INSTRUMENT_NAMES[$TOM1_ID]  := "TOM 1"
+	!INSTRUMENT_NAMES[$TOM2_ID]  := "TOM 2"
+	!INSTRUMENT_NAMES[$TOM3_ID]  := "TOM 3"
+	!INSTRUMENT_NAMES[$TOM4_ID]  := ""
+	!INSTRUMENT_NAMES[$TOM5_ID]  := ""
+	!INSTRUMENT_NAMES[$CYMB1_ID] := "CRASH 1"
+	!INSTRUMENT_NAMES[$CYMB2_ID] := "CRASH 2"
+	!INSTRUMENT_NAMES[$CYMB3_ID] := "RIDE"
+	!INSTRUMENT_NAMES[$CYMB4_ID] := ""
+	!INSTRUMENT_NAMES[$CYMB5_ID] := ""
+	!INSTRUMENT_NAMES[$CYMB6_ID] := ""
+	!INSTRUMENT_NAMES[$CYMB7_ID] := ""
+	!INSTRUMENT_NAMES[$PERC1_ID] := "STICKS"
+	!INSTRUMENT_NAMES[$PERC2_ID] := "CLAPS"
+	!INSTRUMENT_NAMES[$PERC3_ID] := "SHAKER"
+	!INSTRUMENT_NAMES[$PERC4_ID] := "TRIANGLE"
+	!INSTRUMENT_NAMES[$PERC5_ID] := "WOODBLOCK"
+	
+{constants that are to be set per kit}
+	declare %KEY_USED[128] := (1)	{which notes are used for this kit: 0 -> note is NOT used
+																		1 -> note IS used}	
+	{Kick}																    
+	%KEY_USED[2] := 0
+	%KEY_USED[3] := 0
+	{Snares}
+	%KEY_USED[5] := 0
+	%KEY_USED[6] := 0
+	%KEY_USED[8] := 0
+	%KEY_USED[9] := 0
+	%KEY_USED[15] := 0
+	%KEY_USED[16] := 0
+	%KEY_USED[17] := 0
+	%KEY_USED[18] := 0
+	%KEY_USED[19] := 0
+	{HiHat}
+	%KEY_USED[20] := 0
+	%KEY_USED[21] := 0
+	%KEY_USED[22] := 0
+	%KEY_USED[24] := 0
+	%KEY_USED[25] := 0
+	%KEY_USED[27] := 0
+	%KEY_USED[28] := 0
+	%KEY_USED[32] := 0
+	%KEY_USED[34] := 0
+	%KEY_USED[36] := 0
+	%KEY_USED[37] := 0
+	%KEY_USED[38] := 0
+	%KEY_USED[39] := 0
+	{Tom1}
+	%KEY_USED[41] := 0
+	%KEY_USED[42] := 0
+	%KEY_USED[43] := 0
+	%KEY_USED[44] := 0
+	%KEY_USED[45] := 0
+	%KEY_USED[46] := 0
+	{Tom2}
+	%KEY_USED[48] := 0
+	%KEY_USED[49] := 0
+	%KEY_USED[50] := 0
+	%KEY_USED[51] := 0
+	%KEY_USED[52] := 0
+	%KEY_USED[53] := 0
+	{Tom3}
+	%KEY_USED[55] := 0
+	%KEY_USED[56] := 0
+	%KEY_USED[57] := 0
+	%KEY_USED[58] := 0
+	%KEY_USED[59] := 0
+	%KEY_USED[60] := 0
+	{Tom 4-5}
+	%KEY_USED[61] := 0
+	%KEY_USED[62] := 0
+	%KEY_USED[63] := 0
+	%KEY_USED[64] := 0
+	%KEY_USED[65] := 0
+	%KEY_USED[66] := 0
+	%KEY_USED[67] := 0
+	%KEY_USED[68] := 0
+	%KEY_USED[69] := 0
+	%KEY_USED[70] := 0
+	%KEY_USED[71] := 0
+	%KEY_USED[72] := 0
+	%KEY_USED[73] := 0
+	%KEY_USED[74] := 0
+	{Cymbal 1}
+	%KEY_USED[77] := 0
+	%KEY_USED[78] := 0
+	%KEY_USED[79] := 0
+	{Cymbal 2}
+	%KEY_USED[82] := 0
+	%KEY_USED[83] := 0
+	%KEY_USED[84] := 0
+	{Cymbal 3}
+	%KEY_USED[87] := 0
+	%KEY_USED[88] := 0
+	%KEY_USED[89] := 0
+	%KEY_USED[90] := 0
+	{Cymbal 4-7}
+	%KEY_USED[91] := 0
+	%KEY_USED[92] := 0
+	%KEY_USED[93] := 0
+	%KEY_USED[94] := 0
+	%KEY_USED[95] := 0
+	%KEY_USED[96] := 0
+	%KEY_USED[97] := 0
+	%KEY_USED[98] := 0
+	%KEY_USED[99] := 0
+	%KEY_USED[100] := 0
+	%KEY_USED[101] := 0
+	%KEY_USED[102] := 0
+	%KEY_USED[103] := 0
+	%KEY_USED[104] := 0
+	%KEY_USED[105] := 0
+	%KEY_USED[106] := 0
+	{PERC}
+	%KEY_USED[109] := 0
+	%KEY_USED[110] := 0
+	%KEY_USED[113] := 0
+	%KEY_USED[114] := 0
+	%KEY_USED[117] := 0
+	%KEY_USED[119] := 0
+	%KEY_USED[120] := 0
+
+	%KEY_USED[123] := 0
+	%KEY_USED[124] := 0
+	%KEY_USED[125] := 0
+	%KEY_USED[126] := 0
+	%KEY_USED[127] := 0
+	
+	{the MIDI note the first articulation each one of the instruments is mapped to - according to the technical mapping}
+	declare %AC_INSTRUMENT_OFFSET[$NUM_INSTRUMENTS + 1] := (-1)
+	%AC_INSTRUMENT_OFFSET[$KICK_ID]  := 0
+	%AC_INSTRUMENT_OFFSET[$SNARE_ID] := 4
+	%AC_INSTRUMENT_OFFSET[$HH_ID]    := 20
+	%AC_INSTRUMENT_OFFSET[$TOM1_ID]  := 40
+	%AC_INSTRUMENT_OFFSET[$TOM2_ID]  := 47
+	%AC_INSTRUMENT_OFFSET[$TOM3_ID]  := 54
+	%AC_INSTRUMENT_OFFSET[$TOM4_ID]  := 61
+	%AC_INSTRUMENT_OFFSET[$TOM5_ID]  := 68
+	%AC_INSTRUMENT_OFFSET[$CYMB1_ID] := 75
+	%AC_INSTRUMENT_OFFSET[$CYMB2_ID] := 80
+	%AC_INSTRUMENT_OFFSET[$CYMB3_ID] := 85
+	%AC_INSTRUMENT_OFFSET[$CYMB4_ID] := 91
+	%AC_INSTRUMENT_OFFSET[$CYMB5_ID] := 95
+	%AC_INSTRUMENT_OFFSET[$CYMB6_ID] := 99
+	%AC_INSTRUMENT_OFFSET[$CYMB7_ID] := 103
+	%AC_INSTRUMENT_OFFSET[$PERC1_ID] := 107 
+	%AC_INSTRUMENT_OFFSET[$PERC2_ID] := 111
+	%AC_INSTRUMENT_OFFSET[$PERC3_ID] := 115
+	%AC_INSTRUMENT_OFFSET[$PERC4_ID] := 118
+	%AC_INSTRUMENT_OFFSET[$PERC5_ID] := 121
+	%AC_INSTRUMENT_OFFSET[$END_ID] := 127
+	{/constants that are to be set per kit}
+	
+{Group Lists per Articulation}
+	{-----------------------------
+	The number of the row is the note number the articulation is assigned to (refer to the technical mapping document).
+	
+	meaning of columns:
+	#1: Group index of the 1st Direct mic of the articulation
+	#2: Group index of the 2nd Direct mic of the articulation
+	#3: Group index of the 3rd Direct mic of the articulation
+	#4: Group index of the Snare Bleed of the articulation
+	#5: Group index of the 1st Kit mic of the articulation
+	#6: Group index of the 2nd Kit mic of the articulation
+	#7: Group index of the 3rd Kit mic of the articulation
+	#8: Group index of the 4th Kit mic of the articulation	
+	
+	Note: 	If a certain mic type is not available (eg, Snare Bleed for the snare hits), 
+			-1 is going	to be used in the respective column.}
+
+	declare %AC_GROUP_DATA[$MAX_NUM_TOTAL_ART * 8] := (...
+			{KICK}		{0}	    0, 40, 59, -1,  78, 136, 194, -1,...
+						{1}	    0, 40, 59, -1,  78, 136, 194, -1,...
+						{2}	   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{3}	   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+			{SNARE 1}	{4}		9, 49, 68, -1,  87, 145, 203, -1,...
+						{5}		9, 49, 68, -1,  87, 145, 203, -1,...
+						{6}		9, 49, 68, -1,  87, 145, 203, -1,...
+						{7}		9, 49, 68, -1,  87, 145, 203, -1,...
+						{8}		9, 49, 68, -1,  87, 145, 203, -1,...
+						{9}		9, 49, 68, -1,  87, 145, 203, -1,...
+						{10}	9, 49, 68, -1,  87, 145, 203, -1,...
+						{11}	9, 49, 68, -1,  87, 145, 203, -1,...
+						{12}	9, 49, 68, -1,  87, 145, 203, -1,...
+						{13}	9, 49, 68, -1,  87, 145, 203, -1,...
+						{14}	9, 49, 68, -1,  87, 145, 203, -1,...
+						{15}	9, 49, 68, -1,  87, 145, 203, -1,...
+						{16}    9, 49, 68, -1,  87, 145, 203, -1,...
+						{17}    9, 49, 68, -1,  87, 145, 203, -1,...
+						{18}    9, 49, 68, -1,  87, 145, 203, -1,...
+						{19}	9, 49, 68, -1,  87, 145, 203, -1,...
+			{HI-HAT}	{20}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{21}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{22}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{23}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{24}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{25}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{26}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{17}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{28}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{29}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{30}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{31}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{32}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{33}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{34}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{35}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{36}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{37}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{38}   19, -1, -1, -1,  97, 155, 213, -1,...
+						{39}   19, -1, -1, -1,  97, 155, 213, -1,...
+			{TOM 1}		{40}   26, -1, -1, -1, 104, 162, 220, -1,...
+						{41}   26, -1, -1, -1, 104, 162, 220, -1,...
+						{42}   26, -1, -1, -1, 104, 162, 220, -1,...
+						{43}   26, -1, -1, -1, 104, 162, 220, -1,...
+						{44}   26, -1, -1, -1, 104, 162, 220, -1,...
+						{45}   26, -1, -1, -1, 104, 162, 220, -1,...
+						{46}   26, -1, -1, -1, 104, 162, 220, -1,...
+			{TOM 2}		{47}   28, -1, -1, -1, 106, 164, 222, -1,...
+						{48}   28, -1, -1, -1, 106, 164, 222, -1,...
+						{49}   28, -1, -1, -1, 106, 164, 222, -1,...
+						{50}   28, -1, -1, -1, 106, 164, 222, -1,...
+						{51}   28, -1, -1, -1, 106, 164, 222, -1,...
+						{52}   28, -1, -1, -1, 106, 164, 222, -1,...
+						{53}   28, -1, -1, -1, 106, 164, 222, -1,...
+			{TOM 3}		{54}   30, -1, -1, -1, 108, 166, 224, -1,...
+						{55}   30, -1, -1, -1, 108, 166, 224, -1,...
+						{56}   30, -1, -1, -1, 108, 166, 224, -1,...
+						{57}   30, -1, -1, -1, 108, 166, 224, -1,...
+						{58}   30, -1, -1, -1, 108, 166, 224, -1,...
+						{59}   30, -1, -1, -1, 108, 166, 224, -1,...
+						{60}   30, -1, -1, -1, 108, 166, 224, -1,...
+			{TOM 4}		{61}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{62}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{63}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{64}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{65}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{66}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{67}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+			{TOM 5}		{68}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{69}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{70}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{71}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{72}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{73}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{74}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+			{CYMBAL 1}	{75}   -1, -1, -1, -1, 110, 168, 226, -1,...
+						{76}   -1, -1, -1, -1, 110, 168, 226, -1,...
+						{77}   -1, -1, -1, -1, 110, 168, 226, -1,...
+						{78}   -1, -1, -1, -1, 110, 168, 226, -1,...
+						{79}   -1, -1, -1, -1, 110, 168, 226, -1,...
+			{CYMBAL 2}	{80}   -1, -1, -1, -1, 112, 170, 228, -1,...
+						{81}   -1, -1, -1, -1, 112, 170, 228, -1,...
+						{82}   -1, -1, -1, -1, 112, 170, 228, -1,...
+						{83}   -1, -1, -1, -1, 112, 170, 228, -1,...
+						{84}   -1, -1, -1, -1, 112, 170, 228, -1,...
+			{CYMBAL 3}	{85}   -1, -1, -1, -1, 114, 172, 230, -1,...
+						{86}   -1, -1, -1, -1, 114, 172, 230, -1,...
+						{87}   -1, -1, -1, -1, 114, 172, 230, -1,...
+						{88}   -1, -1, -1, -1, 114, 172, 230, -1,...
+						{89}   -1, -1, -1, -1, 114, 172, 230, -1,...
+						{90}   -1, -1, -1, -1, 114, 172, 230, -1,...
+			{CYMBAL 4}	{91}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{92}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{93}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{94}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+			{CYMBAL 5}	{95}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{96}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{97}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{98}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+			{CYMBAL 6}	{99}   -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{100}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{101}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{102}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+			{CYMBAL 7}	{103}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{104}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{105}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{106}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+			{PERC A}	{107}  -1, -1, -1, -1, 116, 174, 232, -1,...
+						{108}  -1, -1, -1, -1, 116, 174, 232, -1,...
+						{109}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{110}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+			{PERC B}	{111}  32, -1, -1, -1, 120, 178, 236, -1,...
+						{112}  32, -1, -1, -1, 120, 178, 236, -1,...
+						{113}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{114}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+			{PERC C}	{115}  36, -1, -1, -1, 124, 182, 240, -1,...
+						{116}  36, -1, -1, -1, 124, 182, 240, -1,...
+						{117}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+			{PERC D}	{118}  -1, -1, -1, -1, 128, 186, 244, -1,...
+						{119}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{120}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+			{PERC E}	{121}  -1, -1, -1, -1, 132, 190, 248, -1,...
+						{122}  -1, -1, -1, -1, 132, 190, 248, -1,...
+						{123}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{124}  -1, -1, -1, -1,  -1,  -1,  -1, -1,...
+						{125}  -1, -1, -1, -1,  -1,  -1,  -1, -1)
+
+ 	declare %EL_GROUP_DATA[$NUM_INSTRUMENTS + 1] := ($NULL)
+			%EL_GROUP_DATA[$KICK_ID]		 := 252
+			%EL_GROUP_DATA[$SNARE_ID]		 := 272
+			%EL_GROUP_DATA[$HH_ID]			 := 292
+			%EL_GROUP_DATA[$OP_HH_ID]		 := 292
+			%EL_GROUP_DATA[$TOM1_ID]		 := 312
+			%EL_GROUP_DATA[$TOM2_ID]		 := 332
+			%EL_GROUP_DATA[$TOM3_ID]		 := 352
+			%EL_GROUP_DATA[$TOM4_ID]		 := $MAX_NUM_GROUPS
+	
+{Mapping}
+	declare %inverse_mapping_data[128]
+	make_persistent(%inverse_mapping_data)
+	
+	
+	{CHOKE KEYS - if these notes are played, all events of their associated group will be faded}
+	declare const $CYMB1_CHOKE := 78
+	declare const $CYMB2_CHOKE := 83
+	declare const $CYMB3_CHOKE := 88
+	declare const $CYMB4_CHOKE := 78
+	declare const $CYMB5_CHOKE := 94
+	declare const $CYMB6_CHOKE := 98
+	declare const $CYMB7_CHOKE := 102
+	
+	{SNARE ROLL Release Rule - After a certain time do not play a note on release}
+	declare const $SNARE_ROLL				:= 13
+	declare const $SNARE_REL_TRIGGER		:= 4
+	declare const $SNARE_ROLL_RELEASE_TIME	:= 5000000
+	
+	declare $snare_roll_played_note
+	
+	declare const $SNARE_SWISH := 18
+	
+	{Instruments per note}
+	declare %note_instruments[128] := (-1) {which key belongs to which instrument}
+	$count_1 := 0
+	$count_2 := 0
+	while ($count_1 < %AC_INSTRUMENT_OFFSET[$END_ID])
+		if ($count_1 >= %AC_INSTRUMENT_OFFSET[$count_2 + 1])
+			inc($count_2)
+		end if
+		%note_instruments[$count_1] := $count_2
+		inc($count_1)
+	end while
+	{/shared across Options, Kit & Voice Control scripts}
+	
+	{special case for the open hihats}
+	$count_1 := 30
+	while ($count_1 < 40)
+		%note_instruments[$count_1] := $OP_HH_ID
+		inc($count_1)
+	end while
+	{/Instruments per note}
+	
+{Instrument Mixer Channels}
+	{The direct channels of each one of the instruments, according to the CHANNEL_PURGE_STATE PGS key created in the mixer page
+	to be set per kit}
+	declare %instr_channel[$NUM_INSTRUMENTS + 1]
+	%instr_channel[$KICK_ID]	:= $TILE_KICK
+	%instr_channel[$SNARE_ID]	:= $TILE_SNARE
+	%instr_channel[$HH_ID]		:= $TILE_HIHAT
+	%instr_channel[$OP_HH_ID]	:= $TILE_HIHAT
+	%instr_channel[$TOM1_ID]	:= $TILE_TOM1
+	%instr_channel[$TOM2_ID]	:= $TILE_TOM2
+	%instr_channel[$TOM3_ID]	:= $TILE_TOM3
+	%instr_channel[$TOM4_ID]	:= -1
+	%instr_channel[$TOM5_ID]	:= -1
+	%instr_channel[$CYMB1_ID]	:= -1
+	%instr_channel[$CYMB2_ID]	:= -1
+	%instr_channel[$CYMB3_ID]	:= -1
+	%instr_channel[$CYMB4_ID]	:= -1
+	%instr_channel[$CYMB5_ID]	:= -1
+	%instr_channel[$CYMB6_ID]	:= -1
+	%instr_channel[$CYMB7_ID]	:= -1
+	%instr_channel[$PERC1_ID]	:= -1
+	%instr_channel[$PERC2_ID]	:= $TILE_PERC2
+	%instr_channel[$PERC3_ID]	:= $TILE_PERC3
+	%instr_channel[$PERC4_ID]	:= -1
+	%instr_channel[$PERC5_ID]	:= -1
+	{/Instrument Mixer Channels}
+    
+{START CONFIGURATION}
+    
+    {Speed Alternation time in milliseconds}
+    declare const $SPEED_ALT_TIME := 160
+    
+    {OPEN HIHAT CHOKING FADE TIMES}
+    declare const $FAR_OHH_FADE_TIME := 100
+    declare const $CLOSE_OHH_FADE_TIME := 50
+    
+    {HIHAT CONTROLLER}
+    declare const $HIHAT_1ST_CC := 1 {Mod Wheel}
+    declare const $HIHAT_2ND_CC := 4 {Hihat Pedal Controller}
+    declare const $HIHAT_NOTE := 31
+    declare $hihat_state := 0
+    declare $last_mw_value
+    make_persistent($last_mw_value)
+    read_persistent_var($last_mw_value)
+    set_controller($HIHAT_1ST_CC, $last_mw_value)
+
+    
+    {SNARE POSITION SENSING}
+    declare const $SNARE_CC := 16
+    declare const $SNARE_NOTE := 4 {Bb1}
+    
+	{VOICE CONTROL IMPLEMENTATION}
+		    {Note: all fadetimes are in milliseconds!}
+		    
+		    {*****KEY*****}			
+		    {loud -> soft: determines the threshold of the velocity difference before the fading kicks in, i.e. only velocity differencec below this number will be faded}
+		    declare %note_key_threshold[128] := (...
+													{C-2} 30,  30,  30,  30,  30,  30,  30,  30,  30,  30,  30,  30,...
+													{C-1} 30,  126, 30,  40,  30,  30,  30,  30,  40,  40,  40,  40,...
+													{C0}  40,  40,  40,  40,  40,  40,  40,  40,  40,  40,  40,  40,...
+													{C1}  40,  40,  40,  40,  30,  30,  30,  30,  40,  30,  30,  30,...
+													{C2}  30,  30,  30,  40,  30,  30,  30,  30,  30,  30,  40,  30,...
+													{C3}  30,  30,  30,  30,  30,  40,  30,  30,  30,  30,  30,  30,...
+													{C4}  40,  30,  30,  30,  30,  30, 126,  30,  30,  30, 126,  30,...
+													{C5}  30,  30, 126,  30,  30,  30, 126,  30,  30,  30, 126,  30,...
+													{C6}  30,  30, 126,  30,  30,  30, 126,  30,  30,  30, 126,  30,...
+													{C7}  30,  30,  30,  30,  30,  30,  40,  40,  40,  30,  30,  30,...
+													{C8}  30,  30,  30,  30,  30,  30,  30,  30) {Ab   A    Bb   B}
+													     {C    Db   D    Eb   E    F    Gb  G}{√}
+		    
+		    declare %note_grp_threshold[$NUM_INSTRUMENTS + 1] := (...
+		                                                          {0}   30,  30,...
+		                                                          {2}   40,  30,...
+		                                                          {4}   30,  30,...
+		                                                          {6}   30,  30,...
+		                                                          {8}   30,  30,...
+		                                                          {10}  30,  30,...
+		                                                          {12}  30,  30,...
+		                                                          {14}  30,  30,...
+		                                                          {16}  30,  30,...
+		                                                          {18}  30,  30,...
+		                                                          {20}  40){√}
+		    
+		    declare %close_key_min_fadetimes[128] := (...
+		                                            {C-2} 10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,...
+		                                            {C-1} 10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,...
+		                                            {C0}  10,  10,  10,  10,  10,  10, 100,  50,  10,  10,  10,  10,...
+		                                            {C1}  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,...
+		                                            {C2}  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,...
+		                                            {C3}  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,...
+		                                            {C4}  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,...
+		                                            {C5}  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,...
+		                                            {C6}  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,...
+		                                            {C7}  50,  50,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,...
+		                                            {C8}  10,  10,  10,  10,  10,  10,  10,  10)  {G#}{A}  {A#} {B}        
+														 {C}  {C#}  {D}  {D#} {E}  {F}  {F#} {G}
+		    
+		    declare %close_key_max_fadetimes[128] := (...
+		                                              {C-2}  500,  500,  500, 1000,  350,  350,  350,  350,  350,  350,  500,  500,...
+		                                              {C-1}  500,  350,  350,  350,  500,  500,  500,  500,  200,  200,  200,  200,...
+		                                              {C0}   200,  200,  200,  200,  200,  350,  400,  400,  400,  400,  400,  400,...
+		                                              {C1}   400,  400,  400,  400,  550,  550,  550,  550,  350, 1000, 1000,  550,...
+		                                              {C2}   550,  550,  550,  350, 1000, 1000,  550,  350,  550,  550,  350, 1000,...
+		                                              {C3}  1000,  550,  350,  350,  550,  350, 1000, 1000, 1000, 1000, 1000, 1000,...
+		                                              {C4}  1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000,...
+		                                              {C5}  1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000,...
+		                                              {C6}  1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000,  350,...
+		                                              {C7}   700,  700,  500,  500, 1000, 1000, 1000, 1000,  500,  500,  500, 1000,...
+		                                              {C8}  1000, 1000, 1000, 1000, 1000,  500,  500,  500)    {Ab}   {A}    {Bb}  {B}
+														    {C}   {Db}  {D}    {Eb}  {E}   {F}   {Gb}  {G}{√}
+		    
+		    declare %far_key_min_fadetimes[128] := (...
+		                                            {C-2}  50,   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,...
+		                                            {C-1}  50,   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,...
+		                                            {C0}   50,   50,   50,   50,   50,  150,  100,   50,   50,   50,   50,   50,...
+		                                            {C1}   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,...
+		                                            {C2}   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,...
+		                                            {C3}   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,...
+		                                            {C4}   50,   50,   50,  100,  100,  100,  100,  100,  100,  100,  100,  100,...
+		                                            {C5}  100,  100,  100,  100,  100,  100,  100,  100,  100,   50,  100,  100,...
+		                                            {C6}   50,   50,  100,   50,   50,   50,   50,   50,   50,   50,   50,   50,...
+		                                            {C7}  100,  100,   50,   50,   50,   50,   50,   50,   50,   50,   50,   50,...
+		                                            {C8}   50,   50,   50,   50,   50,   50,   50,   50)  {Ab}  {A}   {Bb}   {B}
+														  {C}  {Db}  {D}   {Eb}  {E}  {F}    {Gb}  {G}{√}
+		    
+		    declare %far_key_max_fadetimes[128] := (...
+		                                            {C-2}  800,   800,   800,  1000,   700,   700,   700,   700,   700,   700,   800,   800,...
+		                                            {C-1}  800,   700,   700,   700,   800,   800,   800,   600,   600,   600,   600,   600,...
+		                                            {C0}   600,   600,   600,   600,   600,   700,   650,   650,   650,   650,   650,   650,...
+		                                            {C1}   650,   700,   700,   700,   700,   700,   700,   750,   700,  1000,  1000,   700,...
+		                                            {C2}   700,   700,   700,   700,  1000,  1000,   700,   700,   700,   700,   700,  1000,...
+		                                            {C3}  1000,   700,   700,   700,   700,   700,  1000,  1000,  1000,  1000,  1000,  1000,...
+		                                            {C4}  1000,  1000,  1000,  2000,  3000,  3000,  1000,  3000,  2000,  3000,  3000,  1000,...
+		                                            {C5}  3000,  3000,  4000,  4000,  1000,  4000,  3000,  4000,  3000,  1000,  1000,  4000,...
+		                                            {C6}  1000,  1000,  1000,  1000,  1000,  1000,  1000,  1000,  1000,  1000,  1000,   600,...
+		                                            {C7}  700,    700,   800,   800,  1000,  1000,  1000,  1000,   800,   800,   800,  1000,...
+		                                            {C8}  1000,  1000,  1000,  1000,  1000,   800,   800,   800)  {Ab}    {A}   {Bb}    {B}
+														  {C}    {Db}   {D}    {Eb}    {E}    {F}    {Gb}   {G}  {√}
+		    
+		    declare %close_grp_min_fadetimes[$NUM_INSTRUMENTS + 1] := (...
+		                                                               {0}  10, 100,...
+		                                                               {2} 100,  50,...
+		                                                               {4}  50,  50,...
+		                                                               {6}  50,  50,...
+		                                                               {8}  10,  10,...
+		                                                               {10} 10,  10,...
+		                                                               {12} 10,  10,...
+		                                                               {14} 10,  50,...
+		                                                               {16} 50,  50,...
+		                                                               {18} 50,  50,...
+		                                                               {20} 100){√}
+		    
+		    declare %close_grp_max_fadetimes[$NUM_INSTRUMENTS + 1] := (...
+		                                                               {0}  500, 800,...
+		                                                               {2}  350,1500,...
+		                                                               {4} 1500,1500,...
+		                                                               {6} 1500,1500,...
+		                                                               {8} 1000,1000,...
+		                                                               {10}1000,1000,...
+		                                                               {12}1000,1000,...
+		                                                               {14}1000, 350,...
+		                                                               {16} 700, 700,...
+		                                                               {18} 700, 700,...
+		                                                               {20} 400){√}
+		    
+		    declare %far_grp_min_fadetimes[$NUM_INSTRUMENTS + 1] := (...
+		                                                             {0}   50, 150,...
+		                                                             {2}  150, 100,...
+		                                                             {4}  100, 100,...
+		                                                             {6}  100, 100,...
+		                                                             {8}  100, 100,...
+		                                                             {10} 100, 100,...
+		                                                             {12} 100, 100,...
+		                                                             {14} 100, 100,...
+		                                                             {16} 100, 100,...
+		                                                             {18} 100, 100,...
+		                                                             {20} 150){√}
+		    
+		    declare %far_grp_max_fadetimes[$NUM_INSTRUMENTS + 1] := (...
+		                                                             {0}  800,1500,...
+		                                                             {2}  700,1000,...
+		                                                             {4} 2000,2000,...
+		                                                             {6} 2000,2000,...
+		                                                             {8} 2000,3000,...
+		                                                             {10}3000,3000,...
+		                                                             {12}3000,3000,...
+		                                                             {14}3000,3000,...
+		                                                             {16}1000,1000,...
+		                                                             {18}1000,1000,...
+		                                                             {20}1000)
+		    {END VOICE CONTROL}
+	    
+	    declare const $MAX_NOTES := 384
+	    declare %all_notes[$MAX_NOTES]
+	    {array that keeps all sounding notes}
+	    
+	    {CYMBAL EDGE KEYS - those are never faded by other articulations of the same instrument}
+	    declare const $CYMB1_EDGE := 75
+	    declare const $CYMB2_EDGE := 80
+	    declare const $CYMB3_EDGE := 85
+	    declare const $CYMB4_EDGE := 83
+	    declare const $CYMB5_EDGE := 87
+	    declare const $CYMB6_EDGE := 91
+	    declare const $CYMB7_EDGE := 95
+	    
+	    {RIM ONLY KEYS - those keys never fade any other keys}
+	    declare const $SNARE_RIM := 15
+	    declare const $TOM1_RIM := 44
+	    declare const $TOM2_RIM := 51
+	    declare const $TOM3_RIM := 54
+	    declare const $TOM4_RIM := 61
+	    declare const $TOM5_RIM := 68
+
+	    declare %close_mutegroups[$NUM_INSTRUMENTS + 1]
+	    %close_mutegroups[$KICK_ID] := 0
+	    %close_mutegroups[$SNARE_ID] := 1
+	    %close_mutegroups[$HH_ID] := 2
+	    %close_mutegroups[$OP_HH_ID] := 3
+	    %close_mutegroups[$TOM1_ID] := 4
+	    %close_mutegroups[$TOM2_ID] := 5
+	    %close_mutegroups[$TOM3_ID] := 6
+	    %close_mutegroups[$TOM4_ID] := 7
+	    %close_mutegroups[$TOM5_ID] := 8
+	    %close_mutegroups[$CYMB1_ID] := 9
+	    %close_mutegroups[$CYMB2_ID] := 10
+	    %close_mutegroups[$CYMB3_ID] := 11
+	    %close_mutegroups[$CYMB4_ID] := 12
+	    %close_mutegroups[$CYMB5_ID] := 13
+	    %close_mutegroups[$CYMB6_ID] := 14
+	    %close_mutegroups[$CYMB7_ID] := 15
+	    %close_mutegroups[$PERC1_ID] := 16
+	    %close_mutegroups[$PERC2_ID] := 17
+	    %close_mutegroups[$PERC3_ID] := 18
+	    %close_mutegroups[$PERC4_ID] := 19
+	    %close_mutegroups[$PERC5_ID] := 20
+	    
+	    declare %far_mutegroups[$NUM_INSTRUMENTS + 1]
+	    %far_mutegroups[$KICK_ID] := 21
+	    %far_mutegroups[$SNARE_ID] := 22
+	    %far_mutegroups[$HH_ID] := 23
+	    %far_mutegroups[$OP_HH_ID] := 24
+	    %far_mutegroups[$TOM1_ID] := 25
+	    %far_mutegroups[$TOM2_ID] := 26
+	    %far_mutegroups[$TOM3_ID] := 27
+	    %far_mutegroups[$TOM4_ID] := 28
+	    %far_mutegroups[$TOM5_ID] := 29
+	    %far_mutegroups[$CYMB1_ID] := 30
+	    %far_mutegroups[$CYMB2_ID] := 31
+	    %far_mutegroups[$CYMB3_ID] := 32
+	    %far_mutegroups[$CYMB4_ID] := 33
+	    %far_mutegroups[$CYMB5_ID] := 34
+	    %far_mutegroups[$CYMB6_ID] := 35
+	    %far_mutegroups[$CYMB7_ID] := 36
+	    %far_mutegroups[$PERC1_ID] := 37
+	    %far_mutegroups[$PERC2_ID] := 38
+	    %far_mutegroups[$PERC3_ID] := 39
+	    %far_mutegroups[$PERC4_ID] := 40
+	    %far_mutegroups[$PERC5_ID] := 41
+	    
+	    declare %close_flex_mutegroups[$NUM_INSTRUMENTS + 1]
+	    %close_flex_mutegroups[$KICK_ID] := 42
+	    %close_flex_mutegroups[$SNARE_ID] := 43
+	    %close_flex_mutegroups[$HH_ID] := 44
+	    %close_flex_mutegroups[$OP_HH_ID] := 45
+	    %close_flex_mutegroups[$TOM1_ID] := 46
+	    %close_flex_mutegroups[$TOM2_ID] := 47
+	    %close_flex_mutegroups[$TOM3_ID] := 48
+	    %close_flex_mutegroups[$TOM4_ID] := 49
+	    %close_flex_mutegroups[$TOM5_ID] := 50
+	    %close_flex_mutegroups[$CYMB1_ID] := 51
+	    %close_flex_mutegroups[$CYMB2_ID] := 52
+	    %close_flex_mutegroups[$CYMB3_ID] := 53
+	    %close_flex_mutegroups[$CYMB4_ID] := 54
+	    %close_flex_mutegroups[$CYMB5_ID] := 55
+	    %close_flex_mutegroups[$CYMB6_ID] := 56
+	    %close_flex_mutegroups[$CYMB7_ID] := 57
+	    %close_flex_mutegroups[$PERC1_ID] := 58
+	    %close_flex_mutegroups[$PERC2_ID] := 59
+	    %close_flex_mutegroups[$PERC3_ID] := 60
+	    %close_flex_mutegroups[$PERC4_ID] := 61
+	    %close_flex_mutegroups[$PERC5_ID] := 62
+	    
+	    declare %far_flex_mutegroups[$NUM_INSTRUMENTS + 1]
+	    %far_flex_mutegroups[$KICK_ID] := 63
+	    %far_flex_mutegroups[$SNARE_ID] := 64
+	    %far_flex_mutegroups[$HH_ID] := 65
+	    %far_flex_mutegroups[$OP_HH_ID] := 66
+	    %far_flex_mutegroups[$TOM1_ID] := 67
+	    %far_flex_mutegroups[$TOM2_ID] := 68
+	    %far_flex_mutegroups[$TOM3_ID] := 69
+	    %far_flex_mutegroups[$TOM4_ID] := 70
+	    %far_flex_mutegroups[$TOM5_ID] := 71
+	    %far_flex_mutegroups[$CYMB1_ID] := 72
+	    %far_flex_mutegroups[$CYMB2_ID] := 73
+	    %far_flex_mutegroups[$CYMB3_ID] := 74
+	    %far_flex_mutegroups[$CYMB4_ID] := 75
+	    %far_flex_mutegroups[$CYMB5_ID] := 76
+	    %far_flex_mutegroups[$CYMB6_ID] := 77
+	    %far_flex_mutegroups[$CYMB7_ID] := 78
+	    %far_flex_mutegroups[$PERC1_ID] := 79
+	    %far_flex_mutegroups[$PERC2_ID] := 80
+	    %far_flex_mutegroups[$PERC3_ID] := 81
+	    %far_flex_mutegroups[$PERC4_ID] := 82
+	    %far_flex_mutegroups[$PERC5_ID] := 83
+	    
+	    
+	    {Amount of variations per note}
+	    declare %note_variations[128] := (...
+	                                      {C-2} 4,  4,  1,  1,  3,  3,  3,  3,  3,  3,  3,  3,...
+	                                      {C-1} 3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,...
+	                                      {C0}  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,...
+	                                      {C1}  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,...
+	                                      {C2}  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,...
+	                                      {C3}  3,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,...
+	                                      {C4}  1,  1,  1,  2,  2,  2,  2,  2,  2,  2,  2,  2,...
+	                                      {C5}  2,  2,  2,  2,  2,  2,  2,  1,  1,  1,  1,  1,...
+	                                      {C6}  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  3,...
+	                                      {C7}  3,  1,  1,  3,  3,  1,  1,  3,  3,  1,  3,  1,...
+	                                      {C8}  1,  3,  3,  1,  1,  1,  1,  1){G#   A  A#   B} 
+	    									   {C  C#   D   D#  E   F   F#  G}
+
+	    declare %elec_note_variations[128] := (1)
+	    
+	    {which notes are affected by left/right alternation}
+	    declare %note_alternate[128]
+	    %note_alternate[4] := 1  {e.g. D1 will trigger left/right}
+	    %note_alternate[7] := 1
+	    %note_alternate[20] := 1
+	    %note_alternate[23] := 1
+	    %note_alternate[26] := 1
+	    %note_alternate[40] := 1
+	    %note_alternate[47] := 1
+	    %note_alternate[54] := 1
+	    %note_alternate[61] := 1
+	    %note_alternate[68] := 1
+	    
+	    {END CONFIGURATION}
+    
+	declare ui_label $label (3, 1)
+	set_text($label, "Drum Lab Voice Control Engine")
+    
+	{id variables}
+	declare $dr1_note_id
+	declare $dr2_note_id
+	declare $dr3_note_id
+	declare $bld_note_id
+	declare $kt1_note_id
+	declare $kt2_note_id
+	declare $kt3_note_id
+	declare $kt4_note_id
+	declare $ELEC_note_id
+	
+	declare $dr1_grp_id
+	declare $dr2_grp_id
+	declare $dr3_grp_id
+	declare $bld_grp_id
+	declare $kt1_grp_id
+	declare $kt2_grp_id
+	declare $kt3_grp_id
+	declare $kt4_grp_id
+	declare polyphonic $ELEC_grp_id
+	
+	declare %dr1_note_ids[128] {stores the id per key}
+	declare %dr2_note_ids[128]
+	declare %dr3_note_ids[128]
+	declare %bld_note_ids[128]
+	declare %kt1_note_ids[128]
+	declare %kt2_note_ids[128]
+	declare %kt3_note_ids[128]
+	declare %kt4_note_ids[128]
+	declare %elec_note_ids[128]
+	
+	{various variables}
+	declare %random_count_1er[128]
+	declare %last_random_count_1er[128]
+	declare $actual_inst {the instrument ID of the current callback}
+	declare %last_velo[128] {the last received velocity of the key}
+	declare %last_velo_inst[128]  {the last received velocity of the instrument/mute group}
+	declare $velo_diff
+	declare $fade_time
+	declare %alt_last_time[128]
+	declare %alt_count_1[128]
+	declare $play_alternate {1 if other hand should be played. Note: also used for HiHat}
+	
+	{Randomization Amounts}
+	declare $pitch_rand_amt
+	
+	declare const $DIRECT_MIC_RATIO := 20	{percent}
+	
+	declare %RAND_AMT[$NUM_INSTRUMENTS + 1]
+	%RAND_AMT[$KICK_ID] := 1000
+	%RAND_AMT[$SNARE_ID] := 1000
+	%RAND_AMT[$HH_ID] := 800
+	%RAND_AMT[$OP_HH_ID] := 500
+	%RAND_AMT[$TOM1_ID] := 800
+	%RAND_AMT[$TOM2_ID] := 800
+	%RAND_AMT[$TOM3_ID] := 800
+	%RAND_AMT[$TOM4_ID] := 800
+	%RAND_AMT[$TOM5_ID] := -800
+	%RAND_AMT[$CYMB1_ID] := 300
+	%RAND_AMT[$CYMB2_ID] := 300
+	%RAND_AMT[$CYMB3_ID] := 200
+	%RAND_AMT[$CYMB4_ID] := 200
+	%RAND_AMT[$CYMB5_ID] := 200
+	%RAND_AMT[$CYMB6_ID] := 200
+	%RAND_AMT[$CYMB7_ID] := 200
+	%RAND_AMT[$PERC1_ID] := 500
+	%RAND_AMT[$PERC2_ID] := 700
+	%RAND_AMT[$PERC3_ID] := 400
+	%RAND_AMT[$PERC4_ID] := 400
+	%RAND_AMT[$PERC5_ID] := 400
+	{/Randomization Amounts}
+
+	declare %Tile_to_Inst_remap[$NUM_TILES]  := ($NULL)
+			%Tile_to_Inst_remap[$TILE_KICK]	 := $KICK_ID
+			%Tile_to_Inst_remap[$TILE_SNARE] := $SNARE_ID
+			%Tile_to_Inst_remap[$TILE_HIHAT] := $HH_ID
+			%Tile_to_Inst_remap[$TILE_TOM1]	 := $TOM1_ID
+			%Tile_to_Inst_remap[$TILE_TOM2]	 := $TOM2_ID
+			%Tile_to_Inst_remap[$TILE_TOM3]	 := $TOM3_ID
+			%Tile_to_Inst_remap[$TILE_CYMB1] := $CYMB1_ID
+			%Tile_to_Inst_remap[$TILE_CYMB2] := $CYMB2_ID
+			%Tile_to_Inst_remap[$TILE_CYMB3] := $CYMB3_ID
+			%Tile_to_Inst_remap[$TILE_PERC1] := $PERC1_ID
+			%Tile_to_Inst_remap[$TILE_PERC2] := $PERC2_ID
+			%Tile_to_Inst_remap[$TILE_PERC3] := $PERC3_ID
+			%Tile_to_Inst_remap[$TILE_PERC4] := $PERC4_ID
+			%Tile_to_Inst_remap[$TILE_PERC5] := $PERC5_ID
+			{instruments := %Tile_to_Inst_remap[cur_tile] }
+
+	declare %Inst_to_Tile_remap[$NUM_TILES + 1] := ($NULL)
+			%Inst_to_Tile_remap[$KICK_ID]	:= $TILE_KICK
+			%Inst_to_Tile_remap[$SNARE_ID]	:= $TILE_SNARE
+			%Inst_to_Tile_remap[$HH_ID]		:= $TILE_HIHAT
+			%Inst_to_Tile_remap[$TOM1_ID]	:= $TILE_TOM1
+			%Inst_to_Tile_remap[$TOM2_ID]	:= $TILE_TOM2
+			%Inst_to_Tile_remap[$TOM3_ID]	:= $TILE_TOM3
+			%Inst_to_Tile_remap[$CYMB1_ID]	:= $TILE_CYMB1
+			%Inst_to_Tile_remap[$CYMB2_ID]	:= $TILE_CYMB2
+			%Inst_to_Tile_remap[$CYMB3_ID]	:= $TILE_CYMB3
+			%Inst_to_Tile_remap[$PERC1_ID]	:= $TILE_PERC1
+			%Inst_to_Tile_remap[$PERC2_ID]	:= $TILE_PERC2
+			%Inst_to_Tile_remap[$PERC3_ID]	:= $TILE_PERC3
+			%Inst_to_Tile_remap[$PERC4_ID]	:= $TILE_PERC4
+			%Inst_to_Tile_remap[$PERC5_ID]	:= $TILE_PERC5
+			{ $cur_tile :=  %Inst_to_Tile_remap[%note_instruments[$EVENT_NOTE]]}
+end on
+
+on note
+	{if ($message_time < $ENGINE_UPTIME - 3000)
+		message("")
+	end if}
+
+	ignore_event($EVENT_ID)
+	disallow_group($ALL_GROUPS)
+
+	{Is the event is generated by SETTINGS GUI Keyboard Script < or > buttons?}
+	if (get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) = 1 and pgs_get_key_val(SETTINS_FLAG, 0) = 1) 	
+		exit
+	end if
+
+	$actual_inst := %note_instruments[$EVENT_NOTE]
+	
+	$dr1_grp_id := %AC_GROUP_DATA[$EVENT_NOTE * 8 + 0]
+	$dr2_grp_id := %AC_GROUP_DATA[$EVENT_NOTE * 8 + 1]
+	$dr3_grp_id := %AC_GROUP_DATA[$EVENT_NOTE * 8 + 2]
+	$bld_grp_id := %AC_GROUP_DATA[$EVENT_NOTE * 8 + 3]
+	$kt1_grp_id := %AC_GROUP_DATA[$EVENT_NOTE * 8 + 4]
+	$kt2_grp_id := %AC_GROUP_DATA[$EVENT_NOTE * 8 + 5]
+	$kt3_grp_id := %AC_GROUP_DATA[$EVENT_NOTE * 8 + 6]
+	$kt4_grp_id := %AC_GROUP_DATA[$EVENT_NOTE * 8 + 7]
+
+	select ($actual_inst)
+		case $KICK_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_KICK, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_KICK, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_KICK, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_KICK, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_KICK, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_KICK, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_KICK, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_KICK, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_KICK, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "KICK " & pgs_get_key_val(ACTIVE_KICK, 0))
+		case $SNARE_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_SNARE, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_SNARE, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_SNARE, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_SNARE, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_SNARE, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_SNARE, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_SNARE, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_SNARE, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_SNARE, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "SNARE " & pgs_get_key_val(ACTIVE_SNARE, 0))
+		case $HH_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_HIHAT, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "HI HAT " & pgs_get_key_val(ACTIVE_HIHAT, 0))
+		case $OP_HH_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_HIHAT, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_HIHAT, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "HI HAT " & pgs_get_key_val(ACTIVE_HIHAT, 0))
+		case $TOM1_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_TOM1, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_TOM1, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_TOM1, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_TOM1, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_TOM1, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_TOM1, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_TOM1, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_TOM1, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_TOM1, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "TOM A " & pgs_get_key_val(ACTIVE_TOM1, 0))
+		case $TOM2_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_TOM2, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_TOM2, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_TOM2, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_TOM2, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_TOM2, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_TOM2, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_TOM2, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_TOM2, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_TOM2, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "TOM B " & pgs_get_key_val(ACTIVE_TOM1, 0))
+		case $TOM3_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_TOM3, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_TOM3, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_TOM3, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_TOM3, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_TOM3, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_TOM3, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_TOM3, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_TOM3, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_TOM3, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "TOM C " & pgs_get_key_val(ACTIVE_TOM3, 0))
+		case $CYMB1_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_CYMB1, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_CYMB1, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_CYMB1, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_CYMB1, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_CYMB1, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_CYMB1, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_CYMB1, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_CYMB1, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_CYMB1, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "CYMBAL A " & pgs_get_key_val(ACTIVE_CYMB1, 0))
+		case $CYMB2_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_CYMB2, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_CYMB2, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_CYMB2, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_CYMB2, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_CYMB2, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_CYMB2, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_CYMB2, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_CYMB2, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_CYMB2, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "CYMBAL B " & pgs_get_key_val(ACTIVE_CYMB2, 0))
+		case $CYMB3_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_CYMB3, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_CYMB3, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_CYMB3, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_CYMB3, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_CYMB3, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_CYMB3, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_CYMB3, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_CYMB3, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_CYMB3, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "CYMBAL C " & pgs_get_key_val(ACTIVE_CYMB2, 0))
+		case $PERC1_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_PERC1, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_PERC1, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_PERC1, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_PERC1, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_PERC1, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_PERC1, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_PERC1, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_PERC1, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_PERC1, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "PERC A " & pgs_get_key_val(ACTIVE_PERC1, 0))
+		case $PERC2_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_PERC2, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_PERC2, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_PERC2, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_PERC2, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_PERC2, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_PERC2, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_PERC2, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_PERC2, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_PERC2, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "PERC B " & pgs_get_key_val(ACTIVE_PERC2, 0))
+		case $PERC3_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_PERC3, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_PERC3, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_PERC3, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_PERC3, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_PERC3, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_PERC3, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_PERC3, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_PERC3, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_PERC3, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "PERC C " & pgs_get_key_val(ACTIVE_PERC3, 0))
+		case $PERC4_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_PERC4, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_PERC4, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_PERC4, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_PERC4, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_PERC4, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_PERC4, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_PERC4, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_PERC4, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_PERC4, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "PERC D " & pgs_get_key_val(ACTIVE_PERC4, 0))
+		case $PERC5_ID
+			$Ac_loaded_inst := pgs_get_key_val(ACTIVE_PERC5, 0)
+			if ($dr1_grp_id > -1)
+				$dr1_grp_id := $dr1_grp_id + pgs_get_key_val(ACTIVE_PERC5, 0)
+			end if
+			if ($dr2_grp_id > -1)
+				$dr2_grp_id := $dr2_grp_id + pgs_get_key_val(ACTIVE_PERC5, 0)
+			end if
+			if ($dr3_grp_id > -1)
+				$dr3_grp_id := $dr3_grp_id + pgs_get_key_val(ACTIVE_PERC5, 0)
+			end if
+			if ($bld_grp_id > -1)
+				$bld_grp_id := $bld_grp_id + pgs_get_key_val(ACTIVE_PERC5, 0)
+			end if
+			if ($kt1_grp_id > -1)
+				$kt1_grp_id := $kt1_grp_id + pgs_get_key_val(ACTIVE_PERC5, 0)
+			end if
+			if ($kt2_grp_id > -1)
+				$kt2_grp_id := $kt2_grp_id + pgs_get_key_val(ACTIVE_PERC5, 0)
+			end if
+			if ($kt3_grp_id > -1)
+				$kt3_grp_id := $kt3_grp_id + pgs_get_key_val(ACTIVE_PERC5, 0)
+			end if
+			if ($kt4_grp_id > -1)
+				$kt4_grp_id := $kt4_grp_id + pgs_get_key_val(ACTIVE_PERC5, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[10],$CONTROL_PAR_TEXT,...
+				"Ac. Instrument Loaded: " & "PERC E " & pgs_get_key_val(ACTIVE_PERC5, 0))
+	end select
+
+	if ($actual_inst < 6 or $actual_inst = $OP_HH_ID)
+		$ELEC_grp_id := %EL_GROUP_DATA[$actual_inst]
+	end if
+
+	select ($actual_inst)
+		case $KICK_ID
+			$El_loaded_inst := pgs_get_key_val(ELEC_ACTIVE_KICK, 0)
+			if ($ELEC_grp_id > -1)
+				$ELEC_grp_id := $ELEC_grp_id + pgs_get_key_val(ELEC_ACTIVE_KICK, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[19],$CONTROL_PAR_TEXT,...
+				"El. Instrument Loaded: " & "El. Kick " & pgs_get_key_val(ELEC_ACTIVE_KICK, 0))
+		case $SNARE_ID
+			$El_loaded_inst := pgs_get_key_val(ELEC_ACTIVE_SNARE, 0)
+			if ($ELEC_grp_id > -1)
+				$ELEC_grp_id := $ELEC_grp_id + pgs_get_key_val(ELEC_ACTIVE_SNARE, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[19],$CONTROL_PAR_TEXT,...
+				"El. Instrument Loaded: " & "El. Snare " & pgs_get_key_val(ELEC_ACTIVE_SNARE, 0))
+		case $HH_ID
+			$El_loaded_inst := pgs_get_key_val(ELEC_ACTIVE_HIHAT, 0)
+			if ($ELEC_grp_id > -1)
+				$ELEC_grp_id := $ELEC_grp_id + pgs_get_key_val(ELEC_ACTIVE_HIHAT, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[19],$CONTROL_PAR_TEXT,...
+				"El. Instrument Loaded: " & "El. Hi Hat " & pgs_get_key_val(ELEC_ACTIVE_HIHAT, 0))
+		case $OP_HH_ID
+			$El_loaded_inst := pgs_get_key_val(ELEC_ACTIVE_HIHAT, 0)
+			if ($ELEC_grp_id > -1)
+				$ELEC_grp_id := $ELEC_grp_id + pgs_get_key_val(ELEC_ACTIVE_HIHAT, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[19],$CONTROL_PAR_TEXT,...
+				"El. Instrument Loaded: " & "El. Hi Hat " & pgs_get_key_val(ELEC_ACTIVE_HIHAT, 0))
+		case $TOM1_ID
+			$El_loaded_inst := pgs_get_key_val(ELEC_ACTIVE_TOM1, 0)
+			if ($ELEC_grp_id > -1)
+				$ELEC_grp_id := $ELEC_grp_id + pgs_get_key_val(ELEC_ACTIVE_TOM1, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[19],$CONTROL_PAR_TEXT,...
+				"El. Instrument Loaded: " & "El. Tom A " & pgs_get_key_val(ELEC_ACTIVE_TOM1, 0))
+		case $TOM2_ID
+			$El_loaded_inst := pgs_get_key_val(ELEC_ACTIVE_TOM2, 0)
+			if ($ELEC_grp_id > -1)
+				$ELEC_grp_id := $ELEC_grp_id + pgs_get_key_val(ELEC_ACTIVE_TOM2, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[19],$CONTROL_PAR_TEXT,...
+				"El. Instrument Loaded: " & "El. Tom B " & pgs_get_key_val(ELEC_ACTIVE_TOM2, 0))
+		case $TOM3_ID
+			$El_loaded_inst := pgs_get_key_val(ELEC_ACTIVE_TOM3, 0)
+			if ($ELEC_grp_id > -1)
+				$ELEC_grp_id := $ELEC_grp_id + pgs_get_key_val(ELEC_ACTIVE_TOM3, 0)
+			end if
+			set_control_par_str(%sd_controls_ui_id[19],$CONTROL_PAR_TEXT,...
+				"El. Instrument Loaded: " & "El. Tom C " & pgs_get_key_val(ELEC_ACTIVE_TOM3, 0))
+	end select
+	{message($ELEC_grp_id & " | " & $actual_inst)}
+	
+	{message("Event Note: " & $EVENT_NOTE & " | " & $dr1_grp_id & " | " & $dr2_grp_id & " | " & $dr3_grp_id & " | " & $bld_grp_id & " | " & ...
+			    $kt1_grp_id & " | " & $kt2_grp_id & " | " & $kt3_grp_id & " | " & $kt4_grp_id)}
+
+	{message("Event Note: " & $EVENT_NOTE & " | " & $ELEC_grp_id)}
+
+	{VELOCITY CURVES}
+		{Acoustic Layer CURVES}
+			$cur_note := $EVENT_NOTE
+			$cur_velo := $EVENT_VELOCITY
+
+			if ($EVENT_VELOCITY < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+			    $ac_x1 := 1	 
+			    $ac_y1 := 1
+			    $ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL]
+			    $ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_1_VAL]
+			else
+			    if ($EVENT_VELOCITY < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL])
+			        $ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL]	 
+			        $ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_1_VAL]
+			        $ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL]
+			        $ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_2_VAL]
+			    else
+			        if ($EVENT_VELOCITY < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL])
+			            $ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL]
+			            $ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_2_VAL]			
+			            $ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL]
+			            $ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_3_VAL]
+			        else
+			            $ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL]
+			            $ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_3_VAL]
+			            $ac_x2 := 127
+			            $ac_y2 := 127
+			        end if
+			    end if
+			end if
+
+			$new_Ac_velo := ($ac_y2 - $ac_y1) * ($cur_velo - $ac_x2) / ($ac_x2 - $ac_x1) + $ac_y2
+			
+			if ($new_Ac_velo > 127)
+			    $new_Ac_velo := 127
+			else
+			    if ($new_Ac_velo < 1)
+			        $new_Ac_velo := 1
+			    end if
+			end if
+			change_velo($EVENT_ID, $new_Ac_velo)
+			{message("new acoustic VELO: " & $new_Ac_velo & " | cur velo before: " & $cur_velo & " EVENT VELOCITY: " & $EVENT_VELOCITY)}
+		{Electronic Layer CURVES}
+			if ($EVENT_VELOCITY < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+			    $el_x1 := 1	 
+			    $el_y1 := 1
+			    $el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL]
+			    $el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_1_VAL]
+			else
+			    if ($EVENT_VELOCITY < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL])
+			        $el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL]	 
+			        $el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_1_VAL]
+			        $el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL]
+			        $el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_2_VAL]
+			    else
+			        if ($EVENT_VELOCITY < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL])
+			            $el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL]
+			            $el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_2_VAL]			
+			            $el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL]
+			            $el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_3_VAL]
+			        else
+			            $el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL]
+			            $el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_3_VAL]
+			            $el_x2 := 127
+			            $el_y2 := 127
+			        end if
+			    end if
+			end if
+
+			$new_El_velo := ($el_y2 - $el_y1) * ($cur_velo - $el_x2) / ($el_x2 - $el_x1) + $el_y2
+
+			if ($new_El_velo > 127)
+			    $new_El_velo := 127
+			else
+			    if ($new_El_velo < 1)
+			        $new_El_velo := 1
+			    end if
+			end if
+			{/VELOCITY CURVES}
+		{VELOCITY CURVE GUI ADJUSTMENTS}
+			$note := $EVENT_NOTE
+			$note_num := $EVENT_NOTE
+			{Acoustic Layer}
+			$ac_point_1_in  := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL]
+			$ac_point_1_out := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_1_VAL]
+			$ac_point_2_in  := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL]
+			$ac_point_2_out := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_2_VAL]
+			$ac_point_3_in  := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL]
+			$ac_point_3_out := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_3_VAL]
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL])
+					$ac_x1 := 1	 
+					$ac_y1 := 1
+					$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL]
+					$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_1_VAL]
+				else
+					if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL])
+						$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL]
+						$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_1_VAL]
+						$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL]
+						$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_2_VAL]
+					else
+						if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL])
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL]
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_2_VAL]
+							$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL]
+							$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_3_VAL]
+						else
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL]
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_3_VAL]
+							$ac_x2 := 127
+							$ac_y2 := 127
+						end if
+					end if
+				end if
+				
+				$table_new_Ac_velo := ($ac_y2 - $ac_y1) * ($count - $ac_x2) / ($ac_x2 - $ac_x1) + $ac_y2
+				if ($table_new_Ac_velo > 127)
+					$table_new_Ac_velo := 127
+				else
+					if ($table_new_Ac_velo < 1)
+						$table_new_Ac_velo := 1
+					end if
+				end if
+				%ac_table[$count] := $table_new_Ac_velo
+				inc($count)
+			end while
+			{Electronic Layer}
+			if ($actual_inst < 6 or $actual_inst = $OP_HH_ID)	
+				$el_point_1_in  := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL]
+				$el_point_1_out := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_1_VAL]
+				$el_point_2_in  := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL]
+				$el_point_2_out := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_2_VAL]
+				$el_point_3_in  := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL]
+				$el_point_3_out := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_3_VAL]
+
+				$count := 0
+				while ($count < 128)
+					if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL])
+						$el_x1 := 1	 
+						$el_y1 := 1
+						$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL]
+						$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_1_VAL]
+					else
+						if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL])
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_1_VAL]
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_1_VAL]
+							$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL]
+							$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_2_VAL]
+						else
+							if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL])
+								$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_2_VAL]
+								$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_2_VAL]
+								$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL]
+								$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_3_VAL]
+							else
+								$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $INPUT_3_VAL]
+								$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + $OUTPUT_3_VAL]
+								$el_x2 := 127
+								$el_y2 := 127
+							end if
+						end if
+					end if
+					
+					$table_new_El_velo := ($el_y2 - $el_y1) * ($count - $el_x2) / ($el_x2 - $el_x1) + $el_y2
+					if ($table_new_El_velo > 127)
+						$table_new_El_velo := 127
+					else
+						if ($table_new_El_velo < 1)
+							$table_new_El_velo := 1
+						end if
+					end if
+					%el_table[$count] := $table_new_El_velo
+					inc($count)
+				end while
+				{message("Elec Velocity: " & $new_El_velo & "New Acoustic Velo: " & $new_Ac_velo)}
+			else
+				set_control_par_str(%sd_controls_ui_id[19],$CONTROL_PAR_TEXT,"")
+				$count := 0
+				while ($count < 128)
+					%el_table[$count] := 0
+					inc($count)
+				end while
+			end if
+			{/VELOCITY CURVE GUI ADJUSTMENTS}
+	
+	{SPEED ALTERNATE}
+		if (%note_alternate[$EVENT_NOTE] = 1)
+			if ($ENGINE_UPTIME - %alt_last_time[$EVENT_NOTE] < $SPEED_ALT_TIME and %alt_last_time[$EVENT_NOTE] # 0)
+				
+				{speed alternation active}
+				if (%alt_count_1[$EVENT_NOTE] = 0)
+					$play_alternate := 1 {Att: right note}
+					%alt_count_1[$EVENT_NOTE] := 1
+				else
+					$play_alternate := 0 {left, i.e. normal note}
+					%alt_count_1[$EVENT_NOTE] := 0
+				end if
+				
+			else
+				{speed alternation inactive}
+				$play_alternate := 0 {left, i.e. normal note}
+				%alt_count_1[$EVENT_NOTE] := 0
+			end if
+
+			if ($EVENT_NOTE = $SNARE_NOTE and %CC[$SNARE_CC] > 64)
+				$play_alternate := $play_alternate + 6
+			end if
+			
+			%alt_last_time[$EVENT_NOTE] := $ENGINE_UPTIME
+		else
+			{HIHAT}
+			if ($EVENT_NOTE = $HIHAT_NOTE)
+				$play_alternate := 4 - $hihat_state/104 {0 for open hihat, up to 4 for 1/4 closed}
+			else
+				$play_alternate := 0
+			end if
+		end if
+		{END SPEED ALTERNATION}
+
+	{Note Variation}
+		if (%note_variations[$EVENT_NOTE] > 1)
+			while (%random_count_1er[$EVENT_NOTE] = %last_random_count_1er[$EVENT_NOTE])
+				%random_count_1er[$EVENT_NOTE] := random(0,%note_variations[$EVENT_NOTE]-1)
+			end while
+		else
+			%random_count_1er[$EVENT_NOTE] := 0
+		end if
+
+	{Optimization Articulation Offset Hack}
+		if (%note_instruments[$EVENT_NOTE] = $OP_HH_ID)
+			$count_1 := 20
+			$articulation_offset := 20
+		else
+			$count_1 := %AC_INSTRUMENT_OFFSET[%note_instruments[$EVENT_NOTE]]
+			$articulation_offset := %AC_INSTRUMENT_OFFSET[%note_instruments[$EVENT_NOTE]]
+		end if
+		while ($count_1 < $EVENT_NOTE)
+			if ($count_1 = $HIHAT_NOTE)
+				$articulation_offset := $articulation_offset + 5 * %note_variations[$count_1] * %KEY_USED[$count_1]
+			else
+				{message($articulation_offset & " + " & %note_variations[$count_1] & " * " &  (%note_alternate[$count_1] + 1) & " * " &  %KEY_USED[$count_1])}
+				{message($count_1 & " | " & $EVENT_NOTE)}
+				$articulation_offset := $articulation_offset + %note_variations[$count_1] * (%note_alternate[$count_1] + 1) * %KEY_USED[$count_1]
+				if ($count_1 = $SNARE_NOTE)
+					$articulation_offset := $articulation_offset + %note_variations[$count_1] * (%note_alternate[$count_1] + 1) * %KEY_USED[$count_1]
+				end if
+			end if
+			inc($count_1)
+		end while
+		{message($articulation_offset)}
+
+	{%all_notes array sorting}
+		$b := $event_cursor
+		$count_1 := 0
+		$event_cursor := 0
+		while ($count_1 < $b)
+			if (event_status(%all_notes[$count_1]) = 1)
+				%all_notes[$event_cursor] := %all_notes[$count_1]
+				inc($event_cursor)
+			end if
+			inc($count_1)
+		end while
+
+	{if the %all_notes array is close to full - flush it and give a warning}
+		if ($event_cursor >= $MAX_NOTES - 10) 
+			$b := $event_cursor
+			$count_1 := 0
+			$event_cursor := 0
+			while ($count_1 < $b)
+				if($count_1 < 10)
+					fade_out(%all_notes[$count_1], 10000, 1)  
+				else
+					%all_notes[$event_cursor] := %all_notes[$count_1]
+					inc($event_cursor)			
+				end if
+				inc($count_1)
+			end while
+			{message("Voice Overflow - All Voices Killed")}  {the message should be deleted after a while e.g. 3 seconds}
+			$message_time := $ENGINE_UPTIME
+		end if	
+		
+	{VOICE CONTROL START}
+		$count_1 := 0
+		while ($count_1 < 128)
+			if (%note_instruments[$count_1] = $actual_inst) {find the note numbers of the same instrument}
+				{START DR1}
+				if (event_status(%dr1_note_ids[$count_1]) = $EVENT_STATUS_NOTE_QUEUE) 
+					{*** the same note: KEY}
+					if ($count_1 = $EVENT_NOTE)
+						$velo_diff := $EVENT_VELOCITY - %last_velo[$EVENT_NOTE]
+						if (not ($EVENT_VELOCITY < %last_velo[$EVENT_NOTE] and -$velo_diff > %note_key_threshold[$EVENT_NOTE]))
+							$fade_time := (127 - $velo_diff) * (%close_key_max_fadetimes[$EVENT_NOTE] - %close_key_min_fadetimes[$EVENT_NOTE]) / 254 + %close_key_min_fadetimes[$EVENT_NOTE]
+							fade_out(%dr1_note_ids[$EVENT_NOTE],$fade_time*1000,1)
+						else
+							if (-$velo_diff > %note_grp_threshold[$actual_inst])
+								set_event_par(%dr1_note_ids[$count_1], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+							end if
+						end if
+					{*** different note: GRP}
+					else
+						if ($EVENT_NOTE # $SNARE_RIM and...
+							$EVENT_NOTE # $TOM1_RIM and...
+							$EVENT_NOTE # $TOM2_RIM and...
+							$EVENT_NOTE # $TOM3_RIM and...
+							$EVENT_NOTE # $TOM4_RIM and...
+							$EVENT_NOTE # $TOM5_RIM)
+								$velo_diff := $EVENT_VELOCITY - %last_velo_inst[$actual_inst]
+								if (not ($EVENT_VELOCITY < %last_velo_inst[$actual_inst] and -$velo_diff > %note_grp_threshold[$actual_inst]))
+									$fade_time := (127 - $velo_diff) * (%close_grp_max_fadetimes[$actual_inst] - %close_grp_min_fadetimes[$actual_inst]) / 254 + %close_grp_min_fadetimes[$actual_inst]
+									$count_2 := 0
+									while ($count_2 < $event_cursor)
+										if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %close_mutegroups[$actual_inst])
+											fade_out(%all_notes[$count_2], $fade_time*1000,1)
+											set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+										end if
+										inc($count_2)
+									end while
+								else
+									set_event_par(%dr1_note_ids[$count_1], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+								end if
+						end if
+					end if
+				end if
+				{END DR1}
+				
+				{START DR2}
+				if (event_status(%dr2_note_ids[$count_1]) = $EVENT_STATUS_NOTE_QUEUE) 
+					{*** the same note: KEY}
+					if ($count_1 = $EVENT_NOTE)
+						$velo_diff := $EVENT_VELOCITY - %last_velo[$EVENT_NOTE]
+						if (not ($EVENT_VELOCITY < %last_velo[$EVENT_NOTE] and -$velo_diff > %note_key_threshold[$EVENT_NOTE]))
+							$fade_time := (127 - $velo_diff) * (%close_key_max_fadetimes[$EVENT_NOTE] - %close_key_min_fadetimes[$EVENT_NOTE]) / 254 + %close_key_min_fadetimes[$EVENT_NOTE]
+							fade_out(%dr2_note_ids[$EVENT_NOTE],$fade_time*1000,1)
+						else
+							if (-$velo_diff > %note_grp_threshold[$actual_inst])
+								set_event_par(%dr2_note_ids[$count_1], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+							end if
+						end if
+					{*** different note: GRP}
+					else
+						if ($EVENT_NOTE # $SNARE_RIM and...
+							$EVENT_NOTE # $TOM1_RIM and...
+							$EVENT_NOTE # $TOM2_RIM and...
+							$EVENT_NOTE # $TOM3_RIM and...
+							$EVENT_NOTE # $TOM4_RIM and...
+							$EVENT_NOTE # $TOM5_RIM)
+								$velo_diff := $EVENT_VELOCITY - %last_velo_inst[$actual_inst]
+								if (not ($EVENT_VELOCITY < %last_velo_inst[$actual_inst] and -$velo_diff > %note_grp_threshold[$actual_inst]))
+									$fade_time := (127 - $velo_diff) * (%close_grp_max_fadetimes[$actual_inst] - %close_grp_min_fadetimes[$actual_inst]) / 254 + %close_grp_min_fadetimes[$actual_inst]
+									$count_2 := 0
+									while ($count_2 < $event_cursor)
+										if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %close_mutegroups[$actual_inst])
+											fade_out(%all_notes[$count_2], $fade_time*1000,1)
+											set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+										end if
+										inc($count_2)
+									end while
+								else
+									set_event_par(%dr2_note_ids[$count_1], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+								end if
+						end if
+					end if
+				end if
+				{END DR2}
+				
+				{START DR3}
+				if (event_status(%dr3_note_ids[$count_1]) = $EVENT_STATUS_NOTE_QUEUE) 
+					{*** the same note: KEY}
+					if ($count_1 = $EVENT_NOTE)
+						$velo_diff := $EVENT_VELOCITY - %last_velo[$EVENT_NOTE]
+						if (not ($EVENT_VELOCITY < %last_velo[$EVENT_NOTE] and -$velo_diff > %note_key_threshold[$EVENT_NOTE]))
+							$fade_time := (127 - $velo_diff) * (%close_key_max_fadetimes[$EVENT_NOTE] - %close_key_min_fadetimes[$EVENT_NOTE]) / 254 + %close_key_min_fadetimes[$EVENT_NOTE]
+							fade_out(%dr3_note_ids[$EVENT_NOTE],$fade_time*1000,1)
+						else
+							if (-$velo_diff > %note_grp_threshold[$actual_inst])
+								set_event_par(%dr3_note_ids[$count_1], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+							end if
+						end if
+					{*** different note: GRP}
+					else
+						if ($EVENT_NOTE # $SNARE_RIM and...
+							$EVENT_NOTE # $TOM1_RIM and...
+							$EVENT_NOTE # $TOM2_RIM and...
+							$EVENT_NOTE # $TOM3_RIM and...
+							$EVENT_NOTE # $TOM4_RIM and...
+							$EVENT_NOTE # $TOM5_RIM)
+								$velo_diff := $EVENT_VELOCITY - %last_velo_inst[$actual_inst]
+								if (not ($EVENT_VELOCITY < %last_velo_inst[$actual_inst] and -$velo_diff > %note_grp_threshold[$actual_inst]))
+									$fade_time := (127 - $velo_diff) * (%close_grp_max_fadetimes[$actual_inst] - %close_grp_min_fadetimes[$actual_inst]) / 254 + %close_grp_min_fadetimes[$actual_inst]
+									$count_2 := 0
+									while ($count_2 < $event_cursor)
+										if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %close_mutegroups[$actual_inst])
+											fade_out(%all_notes[$count_2], $fade_time*1000,1)
+											set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+										end if
+										inc($count_2)
+									end while
+								else
+									set_event_par(%dr3_note_ids[$count_1], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+								end if
+						end if
+					end if
+				end if
+				{END DR3}
+				
+				{START BLD}
+				if (event_status(%bld_note_ids[$count_1]) = $EVENT_STATUS_NOTE_QUEUE)
+					{*** the same note: KEY}
+					if ($count_1 = $EVENT_NOTE)
+						$velo_diff := $EVENT_VELOCITY - %last_velo[$EVENT_NOTE]
+						if (not ($EVENT_VELOCITY < %last_velo[$EVENT_NOTE] and -$velo_diff > %note_key_threshold[$EVENT_NOTE]))
+							$fade_time := (127 - $velo_diff) * (%close_key_max_fadetimes[$EVENT_NOTE] - %close_key_min_fadetimes[$EVENT_NOTE]) / 254 + %close_key_min_fadetimes[$EVENT_NOTE]
+							fade_out(%bld_note_ids[$EVENT_NOTE],$fade_time*1000,1)
+						else
+							if (-$velo_diff > %note_grp_threshold[$actual_inst])
+								set_event_par(%bld_note_ids[$count_1], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+							end if
+						end if
+					{*** different note: GRP}
+					else
+						if ($EVENT_NOTE # $SNARE_RIM and...
+							$EVENT_NOTE # $TOM1_RIM and...
+							$EVENT_NOTE # $TOM2_RIM and...
+							$EVENT_NOTE # $TOM3_RIM and...
+							$EVENT_NOTE # $TOM4_RIM and...
+							$EVENT_NOTE # $TOM5_RIM)
+							$velo_diff := $EVENT_VELOCITY - %last_velo_inst[$actual_inst]
+							if (not ($EVENT_VELOCITY < %last_velo_inst[$actual_inst] and -$velo_diff > %note_grp_threshold[$actual_inst]))
+								$fade_time := (127 - $velo_diff) * (%close_grp_max_fadetimes[$actual_inst] - %close_grp_min_fadetimes[$actual_inst]) / 254 + %close_grp_min_fadetimes[$actual_inst]
+								$count_2 := 0
+								while ($count_2 < $event_cursor)
+									if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %close_mutegroups[$actual_inst])
+										fade_out(%all_notes[$count_2], $fade_time*1000,1)
+										set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+									end if
+									inc($count_2)
+								end while
+							else
+								set_event_par(%bld_note_ids[$count_1], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+							end if
+						end if
+					end if
+				end if
+				{END BLD}
+				
+				{START KT1}
+				if (event_status(%kt1_note_ids[$count_1]) = $EVENT_STATUS_NOTE_QUEUE) 
+					{*** the same note: KEY}
+					if ($count_1 = $EVENT_NOTE)
+						$velo_diff := $EVENT_VELOCITY - %last_velo[$EVENT_NOTE]
+						if (not ($EVENT_VELOCITY < %last_velo[$EVENT_NOTE] and -$velo_diff > %note_key_threshold[$EVENT_NOTE]))
+							$fade_time := (127 - $velo_diff) * (%far_key_max_fadetimes[$EVENT_NOTE] - %far_key_min_fadetimes[$EVENT_NOTE]) / 254 + %far_key_min_fadetimes[$EVENT_NOTE]
+							fade_out(%kt1_note_ids[$EVENT_NOTE],$fade_time*1000,1)
+						else
+							if (-$velo_diff > %note_grp_threshold[$actual_inst])
+								set_event_par(%kt1_note_ids[$count_1], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+							end if
+						end if
+					{*** different note: GRP}
+					else
+						if ($EVENT_NOTE # $SNARE_RIM and...
+							$EVENT_NOTE # $TOM1_RIM and...
+							$EVENT_NOTE # $TOM2_RIM and...
+							$EVENT_NOTE # $TOM3_RIM and...
+							$EVENT_NOTE # $TOM4_RIM and...
+							$EVENT_NOTE # $TOM5_RIM)
+								$velo_diff := $EVENT_VELOCITY - %last_velo_inst[$actual_inst]
+								if (not ($EVENT_VELOCITY < %last_velo_inst[$actual_inst] and -$velo_diff > %note_grp_threshold[$actual_inst]))
+									$fade_time := (127 - $velo_diff) * (%far_grp_max_fadetimes[$actual_inst] - %far_grp_min_fadetimes[$actual_inst]) / 254 + %far_grp_min_fadetimes[$actual_inst]
+									$count_2 := 0
+									while ($count_2 < $event_cursor)
+										if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %far_mutegroups[$actual_inst])
+											fade_out(%all_notes[$count_2], $fade_time*1000,1)
+											set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+										end if
+										inc($count_2)
+									end while
+								else
+									set_event_par(%kt1_note_ids[$count_1], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+								end if
+						end if
+					end if
+				end if
+				{END KT1}
+				
+				{START KT2}
+				if (event_status(%kt2_note_ids[$count_1]) = $EVENT_STATUS_NOTE_QUEUE) 
+					{*** the same note: KEY}
+					if ($count_1 = $EVENT_NOTE)
+						$velo_diff := $EVENT_VELOCITY - %last_velo[$EVENT_NOTE]
+						if (not ($EVENT_VELOCITY < %last_velo[$EVENT_NOTE] and -$velo_diff > %note_key_threshold[$EVENT_NOTE]))
+							$fade_time := (127 - $velo_diff) * (%far_key_max_fadetimes[$EVENT_NOTE] - %far_key_min_fadetimes[$EVENT_NOTE]) / 254 + %far_key_min_fadetimes[$EVENT_NOTE]
+							fade_out(%kt2_note_ids[$EVENT_NOTE],$fade_time*1000,1)
+						else
+							if (-$velo_diff > %note_grp_threshold[$actual_inst])
+								set_event_par(%kt2_note_ids[$count_1], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+							end if
+						end if
+					{*** different note: GRP}
+					else
+						if ($EVENT_NOTE # $SNARE_RIM and...
+							$EVENT_NOTE # $TOM1_RIM and...
+							$EVENT_NOTE # $TOM2_RIM and...
+							$EVENT_NOTE # $TOM3_RIM and...
+							$EVENT_NOTE # $TOM4_RIM and...
+							$EVENT_NOTE # $TOM5_RIM)
+								$velo_diff := $EVENT_VELOCITY - %last_velo_inst[$actual_inst]
+								if (not ($EVENT_VELOCITY < %last_velo_inst[$actual_inst] and -$velo_diff > %note_grp_threshold[$actual_inst]))
+									$fade_time := (127 - $velo_diff) * (%far_grp_max_fadetimes[$actual_inst] - %far_grp_min_fadetimes[$actual_inst]) / 254 + %far_grp_min_fadetimes[$actual_inst]
+									$count_2 := 0
+									while ($count_2 < $event_cursor)
+										if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %far_mutegroups[$actual_inst])
+											fade_out(%all_notes[$count_2], $fade_time*1000,1)
+											set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+										end if
+										inc($count_2)
+									end while
+								else
+									set_event_par(%kt2_note_ids[$count_1], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+								end if
+						end if
+					end if
+				end if
+				{END KT2}
+				
+				{START KT3}
+				if (event_status(%kt3_note_ids[$count_1]) = $EVENT_STATUS_NOTE_QUEUE) 
+					{*** the same note: KEY}
+					if ($count_1 = $EVENT_NOTE)
+						$velo_diff := $EVENT_VELOCITY - %last_velo[$EVENT_NOTE]
+						if (not ($EVENT_VELOCITY < %last_velo[$EVENT_NOTE] and -$velo_diff > %note_key_threshold[$EVENT_NOTE]))
+							$fade_time := (127 - $velo_diff) * (%far_key_max_fadetimes[$EVENT_NOTE] - %far_key_min_fadetimes[$EVENT_NOTE]) / 254 + %far_key_min_fadetimes[$EVENT_NOTE]
+							fade_out(%kt3_note_ids[$EVENT_NOTE],$fade_time*1000,1)
+						else
+							if (-$velo_diff > %note_grp_threshold[$actual_inst])
+								set_event_par(%kt3_note_ids[$count_1], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+							end if
+						end if
+					{*** different note: GRP}
+					else
+						if ($EVENT_NOTE # $SNARE_RIM and...
+							$EVENT_NOTE # $TOM1_RIM and...
+							$EVENT_NOTE # $TOM2_RIM and...
+							$EVENT_NOTE # $TOM3_RIM and...
+							$EVENT_NOTE # $TOM4_RIM and...
+							$EVENT_NOTE # $TOM5_RIM)
+								$velo_diff := $EVENT_VELOCITY - %last_velo_inst[$actual_inst]
+								if (not ($EVENT_VELOCITY < %last_velo_inst[$actual_inst] and -$velo_diff > %note_grp_threshold[$actual_inst]))
+									$fade_time := (127 - $velo_diff) * (%far_grp_max_fadetimes[$actual_inst] - %far_grp_min_fadetimes[$actual_inst]) / 254 + %far_grp_min_fadetimes[$actual_inst]
+									$count_2 := 0
+									while ($count_2 < $event_cursor)
+										if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %far_mutegroups[$actual_inst])
+											fade_out(%all_notes[$count_2], $fade_time*1000,1)
+											set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+										end if
+										inc($count_2)
+									end while
+								else
+									set_event_par(%kt3_note_ids[$count_1], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+								end if
+						end if
+					end if
+				end if
+				{END KT3}
+				
+				{START KT4}
+				if (event_status(%kt4_note_ids[$count_1]) = $EVENT_STATUS_NOTE_QUEUE) 
+					{*** the same note: KEY}
+					if ($count_1 = $EVENT_NOTE)
+						$velo_diff := $EVENT_VELOCITY - %last_velo[$EVENT_NOTE]
+						if (not ($EVENT_VELOCITY < %last_velo[$EVENT_NOTE] and -$velo_diff > %note_key_threshold[$EVENT_NOTE]))
+							$fade_time := (127 - $velo_diff) * (%far_key_max_fadetimes[$EVENT_NOTE] - %far_key_min_fadetimes[$EVENT_NOTE]) / 254 + %far_key_min_fadetimes[$EVENT_NOTE]
+							fade_out(%kt4_note_ids[$EVENT_NOTE],$fade_time*1000,1)
+						else
+							if (-$velo_diff > %note_grp_threshold[$actual_inst])
+								set_event_par(%kt4_note_ids[$count_1], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+							end if
+						end if
+					{*** different note: GRP}
+					else
+						if ($EVENT_NOTE # $SNARE_RIM and...
+							$EVENT_NOTE # $TOM1_RIM and...
+							$EVENT_NOTE # $TOM2_RIM and...
+							$EVENT_NOTE # $TOM3_RIM and...
+							$EVENT_NOTE # $TOM4_RIM and...
+							$EVENT_NOTE # $TOM5_RIM)
+								$velo_diff := $EVENT_VELOCITY - %last_velo_inst[$actual_inst]
+								if (not ($EVENT_VELOCITY < %last_velo_inst[$actual_inst] and -$velo_diff > %note_grp_threshold[$actual_inst]))
+									$fade_time := (127 - $velo_diff) * (%far_grp_max_fadetimes[$actual_inst] - %far_grp_min_fadetimes[$actual_inst]) / 254 + %far_grp_min_fadetimes[$actual_inst]
+									$count_2 := 0
+									while ($count_2 < $event_cursor)
+										if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %far_mutegroups[$actual_inst])
+											fade_out(%all_notes[$count_2], $fade_time*1000,1)
+											set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+										end if
+										inc($count_2)
+									end while
+								else
+									set_event_par(%kt4_note_ids[$count_1], $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+								end if
+						end if
+					end if
+				end if
+				{END KT4}
+
+				{START ELEC. LAYER}
+				if (event_status(%elec_note_ids[$count_1]) = $EVENT_STATUS_NOTE_QUEUE) 
+					{*** the same note: KEY}
+					if ($count_1 = $EVENT_NOTE)
+						$velo_diff := $EVENT_VELOCITY - %last_velo[$EVENT_NOTE]
+						if (not ($EVENT_VELOCITY < %last_velo[$EVENT_NOTE] and -$velo_diff > %note_key_threshold[$EVENT_NOTE]))
+							$fade_time := (127 - $velo_diff) * (%close_key_max_fadetimes[$EVENT_NOTE] - %close_key_min_fadetimes[$EVENT_NOTE]) / 254 + %close_key_min_fadetimes[$EVENT_NOTE]
+							fade_out(%elec_note_ids[$EVENT_NOTE],$fade_time*1000,1)
+						else
+							if (-$velo_diff > %note_grp_threshold[$actual_inst])
+								set_event_par(%elec_note_ids[$count_1], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+							end if
+						end if
+					{*** different note: GRP}
+					else
+						if ($EVENT_NOTE # $SNARE_RIM and...
+							$EVENT_NOTE # $TOM1_RIM and...
+							$EVENT_NOTE # $TOM2_RIM and...
+							$EVENT_NOTE # $TOM3_RIM and...
+							$EVENT_NOTE # $TOM4_RIM and...
+							$EVENT_NOTE # $TOM5_RIM)
+								$velo_diff := $EVENT_VELOCITY - %last_velo_inst[$actual_inst]
+								if (not ($EVENT_VELOCITY < %last_velo_inst[$actual_inst] and -$velo_diff > %note_grp_threshold[$actual_inst]))
+									$fade_time := (127 - $velo_diff) * (%close_grp_max_fadetimes[$actual_inst] - %close_grp_min_fadetimes[$actual_inst]) / 254 + %close_grp_min_fadetimes[$actual_inst]
+									$count_2 := 0
+									while ($count_2 < $event_cursor)
+										if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %close_mutegroups[$actual_inst])
+											fade_out(%all_notes[$count_2], $fade_time*1000,1)
+											set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+										end if
+										inc($count_2)
+									end while
+								else
+									set_event_par(%elec_note_ids[$count_1], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+								end if
+						end if
+					end if
+				end if
+				{END ELEC. LAYER}
+				
+			end if
+			inc($count_1)
+		end while
+		
+		$cur_velo := $EVENT_VELOCITY
+		$choke_flag := 0
+		$choke_edge := 2
+		if ($actual_inst = $HH_ID)
+			$count_2 := 0
+			while ($count_2 < $event_cursor)
+				if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %far_mutegroups[$OP_HH_ID] or...
+					get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %far_flex_mutegroups[$OP_HH_ID])
+					fade_out(%all_notes[$count_2], $FAR_OHH_FADE_TIME*1000,1)
+					set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %close_flex_mutegroups[$OP_HH_ID])
+					$cur_velo := get_event_par(%all_notes[$count_2], $EVENT_PAR_VELOCITY)
+					$choke_time := get_event_par(%all_notes[$count_2], $EVENT_PAR_2)
+					$choke_flag := 1
+				else
+					if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %close_mutegroups[$OP_HH_ID] or...
+						get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %close_flex_mutegroups[$OP_HH_ID])
+						fade_out(%all_notes[$count_2], $CLOSE_OHH_FADE_TIME*1000,1)
+						set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %close_flex_mutegroups[$OP_HH_ID])
+						$cur_velo := get_event_par(%all_notes[$count_2], $EVENT_PAR_VELOCITY)
+						$choke_time := get_event_par(%all_notes[$count_2], $EVENT_PAR_2)
+						$choke_flag := 1
+					end if
+				end if
+				inc($count_2)
+			end while
+			$cur_velo := $cur_velo - ($ENGINE_UPTIME - $choke_time) / 14
+			if ($cur_velo - $EVENT_VELOCITY > 35)
+				if ($cur_velo < 1)
+					$cur_velo := 1
+				end if
+			else
+				$cur_velo := $EVENT_VELOCITY
+			end if
+		else
+			if ($EVENT_NOTE = $CYMB1_CHOKE or ...
+				$EVENT_NOTE = $CYMB2_CHOKE or...
+				$EVENT_NOTE = $CYMB3_CHOKE or...
+				$EVENT_NOTE = $CYMB4_CHOKE or...
+				$EVENT_NOTE = $CYMB5_CHOKE or...
+				$EVENT_NOTE = $CYMB6_CHOKE or...
+				$EVENT_NOTE = $CYMB7_CHOKE)
+
+				$fade_time := 100 + $EVENT_VELOCITY * 2
+				$count_2 := 0
+				while ($count_2 < $event_cursor)
+					if (get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %far_mutegroups[$actual_inst] or...
+						get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %close_mutegroups[$actual_inst] or...
+						get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %far_flex_mutegroups[$actual_inst] or...
+						get_event_par(%all_notes[$count_2], $EVENT_PAR_0) = %close_flex_mutegroups[$actual_inst])
+						fade_out(%all_notes[$count_2], $fade_time*1000,1)
+						set_event_par(%all_notes[$count_2], $EVENT_PAR_0, %close_flex_mutegroups[$actual_inst])
+						$choke_flag := 1
+						$cur_velo := get_event_par(%all_notes[$count_2], $EVENT_PAR_VELOCITY)
+						$choke_time := get_event_par(%all_notes[$count_2], $EVENT_PAR_2)
+						if (get_event_par(%all_notes[$count_2], $EVENT_PAR_3) = 1)
+							$choke_edge := 1
+						end if
+					end if
+					inc($count_2)
+				end while
+				if ($choke_flag = 0)
+					exit
+				end if
+				$cur_velo := ($cur_velo - ($ENGINE_UPTIME - $choke_time) / 20) / $choke_edge
+				if ($cur_velo < 1)
+					$cur_velo := 1
+				end if
+			end if
+		end if
+		{END VOICE CONTROL}
+
+	{PLAYBACK Voice TRIGGERS}
+		if (pgs_key_exists(TILE_MUTE_STATE))
+
+			$played_note := %random_count_1er[$EVENT_NOTE] + ($play_alternate * %note_variations[$EVENT_NOTE] + $articulation_offset)
+
+			{Trigger Direct 1}
+			if ($dr1_grp_id > -1 and pgs_get_key_val(TILE_MUTE_STATE, %instr_channel[$actual_inst]) = 1)
+
+				$dr1_note_id := play_note(%random_count_1er[$EVENT_NOTE] + ($play_alternate * %note_variations[$EVENT_NOTE] + $articulation_offset),$cur_velo,0,-1)
+				
+				if (pgs_get_key_val(MIC_VOICE_ALLOW, 0) = 0 and %instr_channel[$actual_inst] = $TILE_KICK)	
+					set_event_par_arr($dr1_note_id,$EVENT_PAR_ALLOW_GROUP,0,$dr1_grp_id)
+				else
+					set_event_par_arr($dr1_note_id,$EVENT_PAR_ALLOW_GROUP,1,$dr1_grp_id)
+				end if
+				
+				if (pgs_get_key_val(MIC_VOICE_ALLOW, 3) = 0 and %instr_channel[$actual_inst] = $TILE_SNARE)	
+					set_event_par_arr($dr1_note_id,$EVENT_PAR_ALLOW_GROUP,0,$dr1_grp_id)
+				else
+					set_event_par_arr($dr1_note_id,$EVENT_PAR_ALLOW_GROUP,1,$dr1_grp_id)
+				end if
+
+				if (%instr_channel[$actual_inst] # $TILE_KICK and %instr_channel[$actual_inst] # $TILE_SNARE)
+					set_event_par_arr($dr1_note_id,$EVENT_PAR_ALLOW_GROUP,1,$dr1_grp_id)
+				end if
+
+				set_event_par($dr1_note_id, $EVENT_PAR_0, %close_mutegroups[$actual_inst])
+				set_event_par($dr1_note_id, $EVENT_PAR_2, $ENGINE_UPTIME)
+				
+				%dr1_note_ids[$EVENT_NOTE] := $dr1_note_id
+				%all_notes[$event_cursor] := $dr1_note_id
+				inc($event_cursor)
+			end if
+			{Trigger Direct 2}
+			if ($dr2_grp_id > -1 and pgs_get_key_val(TILE_MUTE_STATE, %instr_channel[$actual_inst]) = 1)
+				
+				$dr2_note_id := play_note(%random_count_1er[$EVENT_NOTE] + ($play_alternate * %note_variations[$EVENT_NOTE]) + $articulation_offset,$cur_velo,0,-1)
+				
+				if (pgs_get_key_val(MIC_VOICE_ALLOW, 1) = 0 and %instr_channel[$actual_inst] = $TILE_KICK)	{Mic Balance Voice Control}
+					set_event_par_arr($dr2_note_id,$EVENT_PAR_ALLOW_GROUP,0,$dr2_grp_id)	{disallow submic group}
+				else
+					set_event_par_arr($dr2_note_id,$EVENT_PAR_ALLOW_GROUP,1,$dr2_grp_id)
+				end if
+
+				if (pgs_get_key_val(MIC_VOICE_ALLOW, 4) = 0 and %instr_channel[$actual_inst] = $TILE_SNARE)	
+					set_event_par_arr($dr2_note_id,$EVENT_PAR_ALLOW_GROUP,0,$dr2_grp_id)
+				else
+					set_event_par_arr($dr2_note_id,$EVENT_PAR_ALLOW_GROUP,1,$dr2_grp_id)
+				end if
+
+				set_event_par($dr2_note_id, $EVENT_PAR_0, %close_mutegroups[$actual_inst])
+				set_event_par($dr2_note_id, $EVENT_PAR_2, $ENGINE_UPTIME)
+
+				%dr2_note_ids[$EVENT_NOTE] := $dr2_note_id
+				%all_notes[$event_cursor] := $dr2_note_id
+				inc($event_cursor)
+			end if
+			{Trigger Direct 3}
+			if ($dr3_grp_id > -1 and pgs_get_key_val(TILE_MUTE_STATE, %instr_channel[$actual_inst]) = 1)
+				
+				$dr3_note_id := play_note(%random_count_1er[$EVENT_NOTE] + ($play_alternate * %note_variations[$EVENT_NOTE]) + $articulation_offset,$cur_velo,0,-1)
+				
+				if (pgs_get_key_val(MIC_VOICE_ALLOW, 2) = 0 and %instr_channel[$actual_inst] = $TILE_KICK)
+					set_event_par_arr($dr3_note_id,$EVENT_PAR_ALLOW_GROUP,0,$dr3_grp_id)
+				else
+					set_event_par_arr($dr3_note_id,$EVENT_PAR_ALLOW_GROUP,1,$dr3_grp_id)
+				end if
+				
+				if (pgs_get_key_val(MIC_VOICE_ALLOW, 5) = 0 and %instr_channel[$actual_inst] = $TILE_SNARE)
+					set_event_par_arr($dr3_note_id,$EVENT_PAR_ALLOW_GROUP,0,$dr3_grp_id)
+				else
+					set_event_par_arr($dr3_note_id,$EVENT_PAR_ALLOW_GROUP,1,$dr3_grp_id)
+				end if
+
+				set_event_par($dr3_note_id, $EVENT_PAR_0, %close_mutegroups[$actual_inst])
+				set_event_par($dr3_note_id, $EVENT_PAR_2, $ENGINE_UPTIME)
+
+				%dr3_note_ids[$EVENT_NOTE] := $dr3_note_id
+				%all_notes[$event_cursor] := $dr3_note_id
+				inc($event_cursor)
+			end if
+			{Trigger Bleed}
+			{if ($bld_grp_id > -1 and pgs_get_key_val(TILE_MUTE_STATE, %instr_channel[$SNARE_ID]) = 1)
+				$bld_note_id := play_note(%random_count_1er[$EVENT_NOTE] + ($play_alternate * %note_variations[$EVENT_NOTE]) + $articulation_offset,$cur_velo,0,-1)
+				if (pgs_get_key_val(MIC_VOICE_ALLOW, 5) = 0  and  (%instr_channel[$actual_inst] = 0 or ...
+																	%instr_channel[$actual_inst] = 3 or ...
+																	%instr_channel[$actual_inst] = 4 or ...
+																	%instr_channel[$actual_inst] = 5 or ...
+																	%instr_channel[$actual_inst] = 6))
+					set_event_par_arr($bld_note_id,$EVENT_PAR_ALLOW_GROUP,0,$bld_grp_id)
+				else
+					set_event_par_arr($bld_note_id,$EVENT_PAR_ALLOW_GROUP,1,$bld_grp_id)
+				end if
+				set_event_par($bld_note_id, $EVENT_PAR_0, %close_mutegroups[$actual_inst])
+				set_event_par($bld_note_id, $EVENT_PAR_2, $ENGINE_UPTIME)
+				%bld_note_ids[$EVENT_NOTE] := $bld_note_id
+				%all_notes[$event_cursor] := $bld_note_id
+				inc($event_cursor)
+			end if}
+			{Trigger Kit 1}
+			if ($kt1_grp_id > -1 and pgs_get_key_val(TILE_MUTE_STATE, $TILE_OHS) = 1 and pgs_get_key_val(KIT_VOICE_ALLOW, $actual_inst) = 1)
+				$kt1_note_id := play_note(%random_count_1er[$EVENT_NOTE] + ($play_alternate * %note_variations[$EVENT_NOTE]) + $articulation_offset,$cur_velo,0,-1)
+				set_event_par_arr($kt1_note_id,$EVENT_PAR_ALLOW_GROUP,1,$kt1_grp_id)
+				set_event_par($kt1_note_id, $EVENT_PAR_0, %far_mutegroups[$actual_inst])
+				set_event_par($kt1_note_id, $EVENT_PAR_2, $ENGINE_UPTIME)
+				%kt1_note_ids[$EVENT_NOTE] := $kt1_note_id
+				%all_notes[$event_cursor] := $kt1_note_id
+				inc($event_cursor)
+			end if
+			{Trigger Kit 2}
+			if ($kt2_grp_id > -1 and pgs_get_key_val(TILE_MUTE_STATE, $TILE_OHM) = 1 and pgs_get_key_val(KIT_VOICE_ALLOW, $actual_inst) = 1)
+				$kt2_note_id := play_note(%random_count_1er[$EVENT_NOTE] + ($play_alternate * %note_variations[$EVENT_NOTE]) + $articulation_offset,$cur_velo,0,-1)
+				set_event_par_arr($kt2_note_id,$EVENT_PAR_ALLOW_GROUP,1,$kt2_grp_id)
+				set_event_par($kt2_note_id, $EVENT_PAR_0, %far_mutegroups[$actual_inst])
+				set_event_par($kt2_note_id, $EVENT_PAR_2, $ENGINE_UPTIME)
+				%kt2_note_ids[$EVENT_NOTE] := $kt2_note_id
+				%all_notes[$event_cursor] := $kt2_note_id
+				inc($event_cursor)
+			end if
+			{Trigger Kit 3}
+			if ($kt3_grp_id > -1 and pgs_get_key_val(TILE_MUTE_STATE, $TILE_ROOM) = 1 and pgs_get_key_val(KIT_VOICE_ALLOW, $actual_inst) = 1)
+				$kt3_note_id := play_note(%random_count_1er[$EVENT_NOTE] + ($play_alternate * %note_variations[$EVENT_NOTE]) + $articulation_offset,$cur_velo,0,-1)
+				set_event_par_arr($kt3_note_id,$EVENT_PAR_ALLOW_GROUP,1,$kt3_grp_id)
+				set_event_par($kt3_note_id, $EVENT_PAR_0, %far_mutegroups[$actual_inst])
+				set_event_par($kt3_note_id, $EVENT_PAR_2, $ENGINE_UPTIME)
+				%kt3_note_ids[$EVENT_NOTE] := $kt3_note_id
+				%all_notes[$event_cursor] := $kt3_note_id
+				inc($event_cursor)
+			end if
+			{Trigger Kit 4}
+			{if ($kt4_grp_id > -1 and pgs_get_key_val(TILE_MUTE_STATE, 12) = 1)
+				$kt4_note_id := play_note(%random_count_1er[$EVENT_NOTE] + ($play_alternate * %note_variations[$EVENT_NOTE]) + $articulation_offset,$cur_velo,0,-1)
+				set_event_par_arr($kt4_note_id,$EVENT_PAR_ALLOW_GROUP,1,$kt4_grp_id)
+				%kt4_note_ids[$EVENT_NOTE] := $kt4_note_id
+				%all_notes[$event_cursor] := $kt4_note_id
+				inc($event_cursor)
+			end if}
+			{Trigger ELECTRONIC LAYER}
+			{if ($kt4_grp_id > -1 and pgs_get_key_val(TILE_MUTE_STATE, 12) = 1)}
+				if (pgs_key_exists(ELEC_DELAY))
+					if ($actual_inst = $OP_HH_ID)
+						$elec_delay := pgs_get_key_val(ELEC_DELAY_OPN_HH, 0)
+						wait($elec_delay)  
+						$ELEC_note_id := play_note($play_alternate * %note_variations[$EVENT_NOTE] + $articulation_offset,$new_El_velo,0,-1)
+						set_event_par_arr($ELEC_note_id,$EVENT_PAR_ALLOW_GROUP,1,$ELEC_grp_id)
+						set_event_par($ELEC_note_id, $EVENT_PAR_0, %close_mutegroups[$actual_inst])
+						set_event_par($ELEC_note_id, $EVENT_PAR_2, $ENGINE_UPTIME)
+						%elec_note_ids[$EVENT_NOTE] := $ELEC_note_id
+						%all_notes[$event_cursor] := $ELEC_note_id
+						inc($event_cursor)
+					else
+						if ($actual_inst < 6)
+							$elec_delay := pgs_get_key_val(ELEC_DELAY, $actual_inst)
+							wait($elec_delay)   
+							$ELEC_note_id := play_note($articulation_offset,$new_El_velo,0,-1)
+							set_event_par_arr($ELEC_note_id,$EVENT_PAR_ALLOW_GROUP,1,$ELEC_grp_id)
+						end if
+						set_event_par($ELEC_note_id, $EVENT_PAR_0, %close_mutegroups[$actual_inst])
+						set_event_par($ELEC_note_id, $EVENT_PAR_2, $ENGINE_UPTIME)
+						%elec_note_ids[$EVENT_NOTE] := $ELEC_note_id
+						%all_notes[$event_cursor] := $ELEC_note_id
+						inc($event_cursor)
+					end if
+				end if
+			{end if}
+			{message($actual_inst)}
+		end if
+	
+	{FOR NEXT EVENT}
+		%last_random_count_1er[$EVENT_NOTE] := %random_count_1er[$EVENT_NOTE]
+		
+		if ($EVENT_NOTE = $CYMB1_EDGE or ...
+			$EVENT_NOTE = $CYMB2_EDGE or ...
+			$EVENT_NOTE = $CYMB3_EDGE or ...
+			$EVENT_NOTE = $CYMB4_EDGE or ...
+			$EVENT_NOTE = $CYMB5_EDGE or ...
+			$EVENT_NOTE = $CYMB6_EDGE or ...
+			$EVENT_NOTE = $CYMB7_EDGE)
+			if ($kt1_grp_id > -1)
+				set_event_par($kt1_note_id, $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+				set_event_par($kt1_note_id, $EVENT_PAR_3, 1)
+			end if
+			if ($kt2_grp_id > -1)
+				set_event_par($kt2_note_id, $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+				set_event_par($kt2_note_id, $EVENT_PAR_3, 1)
+			end if
+			if ($kt3_grp_id > -1)
+				set_event_par($kt3_note_id, $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+				set_event_par($kt3_note_id, $EVENT_PAR_3, 1)
+			end if
+			if ($kt4_grp_id > -1)
+				set_event_par($kt4_note_id, $EVENT_PAR_0, %far_flex_mutegroups[$actual_inst])
+				set_event_par($kt4_note_id, $EVENT_PAR_3, 1)
+			end if
+		end if
+		
+		%last_velo_inst[$actual_inst] := $EVENT_VELOCITY
+	 	%last_velo[$EVENT_NOTE] := $EVENT_VELOCITY
+end on
+{/on note}
+
+on controller
+	select ($CC_NUM)
+		case ($HIHAT_1ST_CC)
+			$hihat_state := %CC[$CC_NUM]
+			$last_mw_value := %CC[$CC_NUM]
+		case ($HIHAT_2ND_CC)
+			$hihat_state := %CC[$CC_NUM] * 2
+			if ($hihat_state > 127)
+				$hihat_state := 127
+			end if
+	end select
+
+	{pitch bend control of Snare Swish(MARK_1) and Snare ROLL(MARK_2)}
+	if ($CC_NUM = $VCC_PITCH_BEND)
+		ignore_controller
+		if (%CC[$VCC_PITCH_BEND] >= 0)
+			change_vol(by_marks($MARK_1),9000 + %CC[$VCC_PITCH_BEND] * 2, 0)
+			change_vol(by_marks($MARK_2),4500 + %CC[$VCC_PITCH_BEND] * 2, 0)
+		end if
+		if (%CC[$VCC_PITCH_BEND] < 0)
+			change_vol(by_marks($MARK_1),9000 + %CC[$VCC_PITCH_BEND] * 3, 0)
+			change_vol(by_marks($MARK_2),4500 + %CC[$VCC_PITCH_BEND] * 4, 0)
+		end if
+	end if
+end on
+
+{VELOCITY CURVE ADJUSTMENTS - CALLBACKS}
+	{Acoustic Layer}
+		on ui_control ($ac_point_1_in)
+			if ($ac_point_1_in >= %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+				$ac_point_1_in := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2] - 1
+			end if
+			
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)] := $ac_point_1_in
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$ac_x1 := 1	 
+					$ac_y1 := 1
+					$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$ac_x2 := 127
+							$ac_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_Ac_velo := ($ac_y2 - $ac_y1) * ($count - $ac_x2) / ($ac_x2 - $ac_x1) + $ac_y2
+				if ($new_Ac_velo > 127)
+					$new_Ac_velo := 127
+				else
+					if ($new_Ac_velo < 1)
+						$new_Ac_velo := 1
+					end if
+				end if
+				
+				%ac_table[$count] := $new_Ac_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($ac_point_1_out)
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1] := $ac_point_1_out
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$ac_x1 := 1	 
+					$ac_y1 := 1
+					$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$ac_x2 := 127
+							$ac_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_Ac_velo := ($ac_y2 - $ac_y1) * ($count - $ac_x2) / ($ac_x2 - $ac_x1) + $ac_y2
+				if ($new_Ac_velo > 127)
+					$new_Ac_velo := 127
+				else
+					if ($new_Ac_velo < 1)
+						$new_Ac_velo := 1
+					end if
+				end if
+				
+				%ac_table[$count] := $new_Ac_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($ac_point_2_in)
+			if ($ac_point_2_in >= %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+				$ac_point_2_in := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4] - 1
+			else
+				if ($ac_point_2_in <= %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$ac_point_2_in := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)] + 1
+				end if
+			end if
+			
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2] := $ac_point_2_in
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$ac_x1 := 1	 
+					$ac_y1 := 1
+					$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$ac_x2 := 127
+							$ac_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_Ac_velo := ($ac_y2 - $ac_y1) * ($count - $ac_x2) / ($ac_x2 - $ac_x1) + $ac_y2
+				if ($new_Ac_velo > 127)
+					$new_Ac_velo := 127
+				else
+					if ($new_Ac_velo < 1)
+						$new_Ac_velo := 1
+					end if
+				end if
+				
+				%ac_table[$count] := $new_Ac_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($ac_point_2_out)
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3] := $ac_point_2_out
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$ac_x1 := 1	 
+					$ac_y1 := 1
+					$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$ac_x2 := 127
+							$ac_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_Ac_velo := ($ac_y2 - $ac_y1) * ($count - $ac_x2) / ($ac_x2 - $ac_x1) + $ac_y2
+				if ($new_Ac_velo > 127)
+					$new_Ac_velo := 127
+				else
+					if ($new_Ac_velo < 1)
+						$new_Ac_velo := 1
+					end if
+				end if
+				
+				%ac_table[$count] := $new_Ac_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($ac_point_3_in)
+			if ($ac_point_3_in <= %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+				$ac_point_3_in := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2] + 1
+			end if
+			
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4] := $ac_point_3_in
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$ac_x1 := 1	 
+					$ac_y1 := 1
+					$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$ac_x2 := 127
+							$ac_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_Ac_velo := ($ac_y2 - $ac_y1) * ($count - $ac_x2) / ($ac_x2 - $ac_x1) + $ac_y2
+				if ($new_Ac_velo > 127)
+					$new_Ac_velo := 127
+				else
+					if ($new_Ac_velo < 1)
+						$new_Ac_velo := 1
+					end if
+				end if
+				
+				%ac_table[$count] := $new_Ac_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($ac_point_3_out)
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5] := $ac_point_3_out
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$ac_x1 := 1	 
+					$ac_y1 := 1
+					$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$ac_x2 := 127
+							$ac_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_Ac_velo := ($ac_y2 - $ac_y1) * ($count - $ac_x2) / ($ac_x2 - $ac_x1) + $ac_y2
+				if ($new_Ac_velo > 127)
+					$new_Ac_velo := 127
+				else
+					if ($new_Ac_velo < 1)
+						$new_Ac_velo := 1
+					end if
+				end if
+				
+				%ac_table[$count] := $new_Ac_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($Ac_Reset)
+			$Ac_Reset := 0
+
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 0] := 32
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1] := 32
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2] := 64
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3] := 64
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4] := 96
+			%AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5] := 96
+
+			$ac_point_1_in  := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+			$ac_point_1_out := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+			$ac_point_2_in  := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+			$ac_point_2_out := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+			$ac_point_3_in  := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+			$ac_point_3_out := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+			
+			$count_1 := 0
+			while ($count_1 < 128)
+				if ($count_1 < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$ac_x1 := 1	 
+					$ac_y1 := 1
+					$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count_1 < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count_1 < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$ac_x2 := 127
+							$ac_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_Ac_velo := ($ac_y2 - $ac_y1) * ($count_1 - $ac_x2) / ($ac_x2 - $ac_x1) + $ac_y2
+				if ($new_Ac_velo > 127)
+					$new_Ac_velo := 127
+				else
+					if ($new_Ac_velo < 1)
+						$new_Ac_velo := 1
+					end if
+				end if
+				
+				%ac_table[$count_1] := $new_Ac_velo
+				inc($count_1)
+			end while
+		end on
+	{Electronic Layer}
+		on ui_control ($el_point_1_in)
+			if ($el_point_1_in >= %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+				$el_point_1_in := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2] - 1
+			end if
+			
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)] := $el_point_1_in
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$el_x1 := 1	 
+					$el_y1 := 1
+					$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$el_x2 := 127
+							$el_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_El_velo := ($el_y2 - $el_y1) * ($count - $el_x2) / ($el_x2 - $el_x1) + $el_y2
+				if ($new_El_velo > 127)
+					$new_El_velo := 127
+				else
+					if ($new_El_velo < 1)
+						$new_El_velo := 1
+					end if
+				end if
+				
+				%el_table[$count] := $new_El_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($el_point_1_out)
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1] := $el_point_1_out
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$el_x1 := 1	 
+					$el_y1 := 1
+					$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$el_x2 := 127
+							$el_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_El_velo := ($el_y2 - $el_y1) * ($count - $el_x2) / ($el_x2 - $el_x1) + $el_y2
+				if ($new_El_velo > 127)
+					$new_El_velo := 127
+				else
+					if ($new_El_velo < 1)
+						$new_El_velo := 1
+					end if
+				end if
+				
+				%el_table[$count] := $new_El_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($el_point_2_in)
+			if ($el_point_2_in >= %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+				$el_point_2_in := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4] - 1
+			else
+				if ($el_point_2_in <= %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$el_point_2_in := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)] + 1
+				end if
+			end if
+			
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2] := $el_point_2_in
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$el_x1 := 1	 
+					$el_y1 := 1
+					$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$el_x2 := 127
+							$el_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_El_velo := ($el_y2 - $el_y1) * ($count - $el_x2) / ($el_x2 - $el_x1) + $el_y2
+				if ($new_El_velo > 127)
+					$new_El_velo := 127
+				else
+					if ($new_El_velo < 1)
+						$new_El_velo := 1
+					end if
+				end if
+				
+				%el_table[$count] := $new_El_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($el_point_2_out)
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3] := $el_point_2_out
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$el_x1 := 1	 
+					$el_y1 := 1
+					$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$el_x2 := 127
+							$el_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_El_velo := ($el_y2 - $el_y1) * ($count - $el_x2) / ($el_x2 - $el_x1) + $el_y2
+				if ($new_El_velo > 127)
+					$new_El_velo := 127
+				else
+					if ($new_El_velo < 1)
+						$new_El_velo := 1
+					end if
+				end if
+				
+				%el_table[$count] := $new_El_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($el_point_3_in)
+			if ($el_point_3_in <= %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+				$el_point_3_in := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2] + 1
+			end if
+			
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4] := $el_point_3_in
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$el_x1 := 1	 
+					$el_y1 := 1
+					$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$el_x2 := 127
+							$el_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_El_velo := ($el_y2 - $el_y1) * ($count - $el_x2) / ($el_x2 - $el_x1) + $el_y2
+				if ($new_El_velo > 127)
+					$new_El_velo := 127
+				else
+					if ($new_El_velo < 1)
+						$new_El_velo := 1
+					end if
+				end if
+				
+				%el_table[$count] := $new_El_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($el_point_3_out)
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5] := $el_point_3_out
+			
+			$count := 0
+			while ($count < 128)
+				if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$el_x1 := 1	 
+					$el_y1 := 1
+					$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$el_x2 := 127
+							$el_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_El_velo := ($el_y2 - $el_y1) * ($count - $el_x2) / ($el_x2 - $el_x1) + $el_y2
+				if ($new_El_velo > 127)
+					$new_El_velo := 127
+				else
+					if ($new_El_velo < 1)
+						$new_El_velo := 1
+					end if
+				end if
+				
+				%el_table[$count] := $new_El_velo
+				inc($count)
+			end while
+		end on
+		on ui_control ($el_Reset)
+			$el_Reset := 0
+
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 0] := 32
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1] := 32
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2] := 64
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3] := 64
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4] := 96
+			%EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5] := 96
+
+			$el_point_1_in  := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+			$el_point_1_out := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+			$el_point_2_in  := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+			$el_point_2_out := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+			$el_point_3_in  := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+			$el_point_3_out := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+			
+			$count_1 := 0
+			while ($count_1 < 128)
+				if ($count_1 < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+					$el_x1 := 1	 
+					$el_y1 := 1
+					$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+					$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+				else
+					if ($count_1 < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+						$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+						$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+						$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+						$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+					else
+						if ($count_1 < %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+							$el_x2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y2 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						else
+							$el_x1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+							$el_y1 := %EL_note_curve[($El_loaded_inst * $EL_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+							$el_x2 := 127
+							$el_y2 := 127
+						end if
+					end if
+				end if
+				
+				$new_El_velo := ($el_y2 - $el_y1) * ($count_1 - $el_x2) / ($el_x2 - $el_x1) + $el_y2
+				if ($new_El_velo > 127)
+					$new_El_velo := 127
+				else
+					if ($new_El_velo < 1)
+						$new_El_velo := 1
+					end if
+				end if
+				
+				%el_table[$count_1] := $new_El_velo
+				inc($count_1)
+			end while
+		end on
+	{Global}
+		on ui_control ($note)
+		$cur_note := $note
+		
+		$count := 0
+		while ($count < 128)
+			if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)])
+				$ac_x1 := 1	 
+				$ac_y1 := 1
+				$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]
+				$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+			else
+				if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2])
+					$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS)]	 
+					$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 1]
+					$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]
+					$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+				else
+					if ($count < %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4])
+						$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 2]	 
+						$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 3]
+						$ac_x2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+						$ac_y2 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+					else
+						$ac_x1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 4]
+						$ac_y1 := %AC_note_curve[($Ac_loaded_inst * $AC_NUM_ART * $CURV_POINTS) + ($cur_note * $CURV_POINTS) + 5]
+						$ac_x2 := 127
+						$ac_y2 := 127
+					end if
+				end if
+			end if
+			
+			$new_Ac_velo := ($ac_y2 - $ac_y1) * ($count - $ac_x2) / ($ac_x2 - $ac_x1) + $ac_y2
+			if ($new_Ac_velo > 127)
+				$new_Ac_velo := 127
+			else
+				if ($new_Ac_velo < 1)
+					$new_Ac_velo := 1
+				end if
+			end if
+			
+			%ac_table[$count] := $new_Ac_velo
+			inc($count)
+		end while
+		end on
+	{/VELOCITY CURVE ADJUSTMENTS - CALLBACKS}
+
+on pgs_changed
+	select (pgs_get_key_val(COMMAND, 0))
+		case 0
+			if (pgs_key_exists(AC_LOAD_PURGE_STATE))
+				$count_1 := 0
+				while ($count_1 < $AC_NUM_GROUPS)
+					%Ac_Group_PURGE_State[$count_1] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $count_1)
+					inc($count_1)
+				end while
+			end if
+
+			if (pgs_key_exists(EL_LOAD_PURGE_STATE))
+				$count_1 := 0
+				while ($count_1 < $EL_NUM_GROUPS)
+					%El_Group_PURGE_State[$count_1] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $count_1)
+					inc($count_1)
+				end while
+			end if
+
+			inc($debug)
+
+			set_text($debug_monitor,"")
+			$count_1 := 0
+			while ($count_1 < $EL_NUM_GROUPS)
+					add_text_line($debug_monitor, $count_1 & "    " & %El_Group_PURGE_State[$count_1])
+					inc($count_1)
+			end while
+
+			{message("PURGE CODE TRIGGERED " & $debug & " times: - " & %El_Group_PURGE_State[0] & " | " & %El_Group_PURGE_State[1] & " | " & %El_Group_PURGE_State[2] & " | " & %El_Group_PURGE_State[3] & " | " & ...
+			%El_Group_PURGE_State[4] & " | " & %El_Group_PURGE_State[5] & " | " & %El_Group_PURGE_State[6] & " | " & ...
+			%El_Group_PURGE_State[7] & " | " & %El_Group_PURGE_State[8])}
+	end select
+end on

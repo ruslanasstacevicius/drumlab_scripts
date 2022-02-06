@@ -1,0 +1,3900 @@
+{***********************************************
+Drum Lab
+Grooves Page
+Author: Native Instruments
+Written by: Thanos Kazakos
+Modified: August 7th, 2013
+*************************************************}
+
+on init
+{general variables & constants}
+	message("")
+	
+	make_perfview
+	set_ui_height_px(540)
+	set_skin_offset(633)
+	set_script_title("Grooves")
+	
+	declare $debug
+	declare $playing_flag
+	declare $key_counter
+	
+	set_control_par_str($INST_ICON_ID, $CONTROL_PAR_PICTURE, "NID_instrument_icon")
+	
+	pgs_create_key(COMMAND, 1)	{key: 		-1 	-> 	Prep
+											0 	-> 	Purge
+											1	->	Mixer (Sound Preset -> SOUND)
+											2	->	Groove
+											3	->	Init
+											4	->	Randomize
+											5	-> 	Snare
+											6	->	Mapping}
+	pgs_create_key(GROOVE_ACTION, 4)
+	pgs_create_str_key(GROOVE_TITLE)
+
+	pgs_create_key(LOADED_MIDI, 13)
+	
+	declare const $FONT_ID := 15
+
+	declare const $PREP		:= -1
+	declare const $PURGE	:= 0
+	declare const $SOUND	:= 1
+	declare const $GROOVE	:= 2
+	declare const $MAPPING	:= 6
+	{semantics}
+	declare const $YES			 :=  1
+	declare const $NO			 :=  0
+	declare const $ON			 :=  1
+	declare const $OFF			 :=  0
+	declare const $PRESSED		 :=  1
+	declare const $NULL			 := -1
+
+	declare const $VIS_KICK_TRK	 := 0
+	declare const $VIS_SNARE_TRK := 1
+	declare const $VIS_HIHAT_TRK := 2
+	declare const $VIS_TOMS_TRK	 := 3
+	declare const $VIS_PERC_TRK	 := 4
+	declare const $VIS_RIDE_TRK	 := 5
+	declare const $VIS_CYMB_TRK	 := 6
+
+	declare const $MIDI_TRK_01 := 0
+	declare const $MIDI_TRK_02 := 1
+	declare const $MIDI_TRK_03 := 2
+	declare const $MIDI_TRK_04 := 3
+	declare const $MIDI_TRK_05 := 4
+	declare const $MIDI_TRK_06 := 5
+	declare const $MIDI_TRK_07 := 6
+	declare const $MIDI_TRK_08 := 7
+	declare const $MIDI_TRK_09 := 8
+	declare const $MIDI_TRK_10 := 9
+	declare const $MIDI_TRK_11 := 10
+	declare const $MIDI_TRK_12 := 11
+
+	declare const $REPLACE_ALL		:= 0
+	declare const $REPLACE_OVERLAP	:= 1
+	declare const $MERGE			:= 2
+
+	declare const $MIDI_PTTRN_LOW	:= 12
+	declare const $MIDI_PTTRN_HIGH	:= 23
+	declare const $MAX_NUM_PATTERNS	:= 12
+
+	declare $init_flag := 1
+	declare $midi_init := 0
+	declare $count_1
+	declare $count_2
+	declare $count_3
+	declare $group_count
+	declare $a
+	declare $b
+	declare $c
+	declare $d
+	declare $x
+	declare $y
+	declare $z
+
+	declare %load_check_id[04] := (-1)
+
+	declare const $APPLY_CHANGES_TIME := 10000			{time to wait when processing the MIDI object - to avoid conflicts with playback}
+	declare const $KNOB_ADJUSTMENT_TOLERANCE := 200000
+	declare const $LISTENER_RESOL := 24		{in times per beat}
+	declare const $LISTENER_BEAT_LENGTH_TICKS := 960 / $LISTENER_RESOL
+
+{SETUP Common to all scripts}
+	
+	declare const $KICK_ID	:= 0
+	declare const $SNARE_ID	:= 1
+	declare const $HH_ID	:= 2
+	declare const $TOM1_ID	:= 3
+	declare const $TOM2_ID	:= 4
+	declare const $TOM3_ID	:= 5
+	declare const $TOM4_ID	:= 6
+	declare const $TOM5_ID	:= 7
+	declare const $CYMB1_ID	:= 8
+	declare const $CYMB2_ID	:= 9
+	declare const $CYMB3_ID	:= 10
+	declare const $CYMB4_ID	:= 11
+	declare const $CYMB5_ID	:= 12
+	declare const $CYMB6_ID	:= 13
+	declare const $CYMB7_ID	:= 14
+	declare const $PERC1_ID	:= 15
+	declare const $PERC2_ID	:= 16
+	declare const $PERC3_ID	:= 17
+	declare const $PERC4_ID	:= 18
+	declare const $PERC5_ID	:= 19
+	declare const $END_ID	:= 20
+
+	declare const $NUM_INSTRUMENTS := 20
+
+	declare const $AC_NUM_GROUPS := 252
+	declare const $EL_NUM_GROUPS := 120
+
+	{customized for visual display}
+	declare %AC_INSTRUMENT_OFFSET[$NUM_INSTRUMENTS + 1] := ($NULL)
+	%AC_INSTRUMENT_OFFSET[$KICK_ID]	 := 0
+	%AC_INSTRUMENT_OFFSET[$SNARE_ID] := 4
+	%AC_INSTRUMENT_OFFSET[$HH_ID]	 := 20
+	%AC_INSTRUMENT_OFFSET[$TOM1_ID]	 := 40
+	%AC_INSTRUMENT_OFFSET[$TOM2_ID]	 := 47
+	%AC_INSTRUMENT_OFFSET[$TOM3_ID]	 := 54
+	%AC_INSTRUMENT_OFFSET[$TOM4_ID]	 := 61
+	%AC_INSTRUMENT_OFFSET[$TOM5_ID]	 := 68
+	%AC_INSTRUMENT_OFFSET[$CYMB1_ID] := 75
+	%AC_INSTRUMENT_OFFSET[$CYMB2_ID] := 80
+	%AC_INSTRUMENT_OFFSET[$CYMB3_ID] := 85
+	%AC_INSTRUMENT_OFFSET[$CYMB4_ID] := 91
+	%AC_INSTRUMENT_OFFSET[$CYMB5_ID] := 95
+	%AC_INSTRUMENT_OFFSET[$CYMB6_ID] := 99
+	%AC_INSTRUMENT_OFFSET[$CYMB7_ID] := 103
+	%AC_INSTRUMENT_OFFSET[$PERC1_ID] := 107
+	%AC_INSTRUMENT_OFFSET[$PERC2_ID] := 111
+	%AC_INSTRUMENT_OFFSET[$PERC3_ID] := 115
+	%AC_INSTRUMENT_OFFSET[$PERC4_ID] := 118
+	%AC_INSTRUMENT_OFFSET[$PERC5_ID] := 121
+	%AC_INSTRUMENT_OFFSET[$END_ID]   := 126
+
+
+	{Instruments per note}
+	declare %note_instruments[128] := ($NULL) {which key belongs to which instrument}
+	$x := 0
+	$y := 0
+	while ($x < %AC_INSTRUMENT_OFFSET[$END_ID])
+		if ($x >= %AC_INSTRUMENT_OFFSET[$y + 1])
+			inc($y)
+		end if
+		%note_instruments[$x] := $y
+		inc($x)
+	end while
+											   
+	declare %visual_remap[$NUM_INSTRUMENTS]
+			%visual_remap[$KICK_ID]	 := 0
+			%visual_remap[$SNARE_ID] := 1
+			%visual_remap[$HH_ID]	 := 2
+			%visual_remap[$TOM1_ID]	 := 3
+			%visual_remap[$TOM2_ID]	 := 3
+			%visual_remap[$TOM3_ID]	 := 3
+			%visual_remap[$TOM4_ID]	 := 3
+			%visual_remap[$TOM5_ID]	 := 3
+			%visual_remap[$CYMB1_ID] := 6
+			%visual_remap[$CYMB2_ID] := 6
+			%visual_remap[$CYMB3_ID] := 5
+			%visual_remap[$CYMB4_ID] := 5
+			%visual_remap[$CYMB5_ID] := 5
+			%visual_remap[$CYMB6_ID] := 5
+			%visual_remap[$CYMB7_ID] := 5
+			%visual_remap[$PERC1_ID] := 4
+			%visual_remap[$PERC2_ID] := 4
+			%visual_remap[$PERC3_ID] := 4
+			%visual_remap[$PERC4_ID] := 4
+			%visual_remap[$PERC5_ID] := 4
+
+
+	declare %Ac_Group_PURGE_State[$AC_NUM_GROUPS]
+	make_persistent(%Ac_Group_PURGE_State)
+	read_persistent_var(%Ac_Group_PURGE_State)
+	
+	declare %El_Group_PURGE_State[$EL_NUM_GROUPS]
+	make_persistent(%El_Group_PURGE_State)
+	read_persistent_var(%El_Group_PURGE_State)
+
+{MIDI file properties & Variables
+	_1 suffix --> file original state. for recalling the original state without the need to reload the file
+	_2 suffix --> latest state of the file / used as the edit buffer}
+	declare $mf_num_events
+
+	declare const $MF_LENGTH := 7680				{2 BARS in ticks}
+	declare $mf_tmp_length	 := $MF_LENGTH 			{the length of the MIDI file, ie the position of its last event - in ticks}
+	declare const $TRACK_IDX := 0					{track idx used for all relevant commands}
+
+	declare $load_mf_id := -1
+	declare @file_name
+	declare @file_path
+	declare @last_file_path
+
+	{declare !mf_loaded_names[$MAX_NUM_PATTERNS]
+	declare !mf_loaded_paths[$MAX_NUM_PATTERNS]}
+
+	declare $active_midi_track := 0 {Track 0 always holds the loaded MIDI groove from }
+	declare $check_note
+	declare $temp_midi_track
+	declare $mf_track_counter
+	declare $last_pattern_selected := 999
+	declare $pattern_edit_flag := 0
+
+	declare $mf_event_position
+	declare $mf_event_position_ticks
+	declare $mf_event_instrument
+	declare $mf_event_velocity
+
+
+	declare %key_has_pattern[$MAX_NUM_PATTERNS + 1]
+	make_persistent(%key_has_pattern)
+	read_persistent_var(%key_has_pattern)
+
+	declare @loaded_mf_name_01
+    declare @loaded_mf_name_02
+    declare @loaded_mf_name_03
+    declare @loaded_mf_name_04
+    declare @loaded_mf_name_05
+    declare @loaded_mf_name_06
+    declare @loaded_mf_name_07
+    declare @loaded_mf_name_08
+    declare @loaded_mf_name_09
+    declare @loaded_mf_name_10
+    declare @loaded_mf_name_11
+    declare @loaded_mf_name_12
+
+    make_persistent(@loaded_mf_name_01)
+    make_persistent(@loaded_mf_name_02)
+    make_persistent(@loaded_mf_name_03)
+    make_persistent(@loaded_mf_name_04)
+    make_persistent(@loaded_mf_name_05)
+    make_persistent(@loaded_mf_name_06)
+    make_persistent(@loaded_mf_name_07)
+    make_persistent(@loaded_mf_name_08)
+    make_persistent(@loaded_mf_name_09)
+    make_persistent(@loaded_mf_name_10)
+    make_persistent(@loaded_mf_name_11)
+    make_persistent(@loaded_mf_name_12)
+
+    read_persistent_var(@loaded_mf_name_01)
+    read_persistent_var(@loaded_mf_name_02)
+    read_persistent_var(@loaded_mf_name_03)
+    read_persistent_var(@loaded_mf_name_04)
+    read_persistent_var(@loaded_mf_name_05)
+    read_persistent_var(@loaded_mf_name_06)
+    read_persistent_var(@loaded_mf_name_07)
+    read_persistent_var(@loaded_mf_name_08)
+    read_persistent_var(@loaded_mf_name_09)
+    read_persistent_var(@loaded_mf_name_10)
+    read_persistent_var(@loaded_mf_name_11)
+    read_persistent_var(@loaded_mf_name_12)
+
+    declare @loaded_mf_path_01
+    declare @loaded_mf_path_02
+    declare @loaded_mf_path_03
+    declare @loaded_mf_path_04
+    declare @loaded_mf_path_05
+    declare @loaded_mf_path_06
+    declare @loaded_mf_path_07
+    declare @loaded_mf_path_08
+    declare @loaded_mf_path_09
+    declare @loaded_mf_path_10
+    declare @loaded_mf_path_11
+    declare @loaded_mf_path_12
+    
+    make_persistent(@loaded_mf_path_01)
+    make_persistent(@loaded_mf_path_02)
+    make_persistent(@loaded_mf_path_03)
+    make_persistent(@loaded_mf_path_04)
+    make_persistent(@loaded_mf_path_05)
+    make_persistent(@loaded_mf_path_06)
+    make_persistent(@loaded_mf_path_07)
+    make_persistent(@loaded_mf_path_08)
+    make_persistent(@loaded_mf_path_09)
+    make_persistent(@loaded_mf_path_10)
+    make_persistent(@loaded_mf_path_11)
+    make_persistent(@loaded_mf_path_12)
+    
+    read_persistent_var(@loaded_mf_path_01)
+    read_persistent_var(@loaded_mf_path_02)
+    read_persistent_var(@loaded_mf_path_03)
+    read_persistent_var(@loaded_mf_path_04)
+    read_persistent_var(@loaded_mf_path_05)
+    read_persistent_var(@loaded_mf_path_06)
+    read_persistent_var(@loaded_mf_path_07)
+    read_persistent_var(@loaded_mf_path_08)
+    read_persistent_var(@loaded_mf_path_09)
+    read_persistent_var(@loaded_mf_path_10)
+    read_persistent_var(@loaded_mf_path_11)
+    read_persistent_var(@loaded_mf_path_12)
+    
+    declare !mf_loaded_names[12]
+    !mf_loaded_names[00] := @loaded_mf_name_01
+    !mf_loaded_names[01] := @loaded_mf_name_02
+    !mf_loaded_names[02] := @loaded_mf_name_03
+    !mf_loaded_names[03] := @loaded_mf_name_04
+    !mf_loaded_names[04] := @loaded_mf_name_05
+    !mf_loaded_names[05] := @loaded_mf_name_06
+    !mf_loaded_names[06] := @loaded_mf_name_07
+    !mf_loaded_names[07] := @loaded_mf_name_08
+    !mf_loaded_names[08] := @loaded_mf_name_09
+    !mf_loaded_names[09] := @loaded_mf_name_10
+    !mf_loaded_names[10] := @loaded_mf_name_11
+    !mf_loaded_names[11] := @loaded_mf_name_12
+
+    declare !mf_loaded_paths[12]
+    !mf_loaded_paths[00] := @loaded_mf_path_01
+    !mf_loaded_paths[01] := @loaded_mf_path_02
+    !mf_loaded_paths[02] := @loaded_mf_path_03
+    !mf_loaded_paths[03] := @loaded_mf_path_04
+    !mf_loaded_paths[04] := @loaded_mf_path_05
+    !mf_loaded_paths[05] := @loaded_mf_path_06
+    !mf_loaded_paths[06] := @loaded_mf_path_07
+    !mf_loaded_paths[07] := @loaded_mf_path_08
+    !mf_loaded_paths[08] := @loaded_mf_path_09
+    !mf_loaded_paths[09] := @loaded_mf_path_10
+    !mf_loaded_paths[10] := @loaded_mf_path_11
+    !mf_loaded_paths[11] := @loaded_mf_path_12
+
+{variables shared across multiple functions}
+	declare $old_pos
+	declare $pos_offset
+	declare $processing_flag
+	declare $new_mf_flag
+	declare $processed_flag_value := 100
+
+{quantize function variables}
+	declare $quant_resol		{in ticks}
+	declare $temp_quant_resol
+	declare $quant_amount
+	declare $grid_value
+	declare %quant_resol_transform[6] := (480, 320, 240, 160, 120, 80)
+
+{swing function additions}
+	declare $swing_cycle	{in ticks}
+	declare $swing_amount
+	declare %swing_cycle_transform[6] := (960, 960, 480, 480, 240, 240)
+
+{velocity_processing function variables}
+	declare $lower
+	declare $higher
+
+{length function variables}
+	declare $stretch_amt
+	declare $visual_stretch
+	make_persistent($visual_stretch)
+	read_persistent_var($visual_stretch)
+
+{playback related variables}
+	declare $wrap_flag
+	declare $cur_listener_id
+	declare $event_vel
+	declare $prev_ext_song_pos
+	declare $cur_song_pos
+	declare $diff
+	declare $last_pos
+	declare $start_of_beat
+	declare $end_of_beat
+	declare $beat_start_time
+	
+	declare $old_play
+	declare $play_flag
+	declare $last_callback_id
+
+	set_listener($NI_SIGNAL_TIMER_BEAT, $LISTENER_RESOL)
+	
+{GUI SET UP}
+	{Declarations}
+		declare ui_file_selector $file_selector
+		declare ui_button $play_btn
+		declare ui_label  $groove_display_lbl (1, 1)
+		declare ui_button $prev_groove_btn
+		declare ui_button $next_groove_btn
+		declare ui_slider $quantize_sld (-99 , 99)
+		declare ui_slider $swing_sld (0, 60)
+		declare ui_slider $velocity_sld (-126, 127)
+		declare ui_button $half_btn
+		declare ui_button $normal_btn
+		declare ui_button $double_btn
+		declare ui_slider $grid_sld (0, 5)
+		declare ui_button $grid_up_btn
+		declare ui_button $grid_dn_btn
+
+	{GUI ui_ids}
+		declare %ui_id[14]
+		%ui_id[0] := get_ui_id($file_selector)
+		%ui_id[1] := get_ui_id($play_btn)
+		%ui_id[2] := get_ui_id($groove_display_lbl)
+		%ui_id[3] := get_ui_id($prev_groove_btn)
+		%ui_id[4] := get_ui_id($next_groove_btn)
+		%ui_id[5] := get_ui_id($quantize_sld)
+		%ui_id[6] := get_ui_id($swing_sld)
+		%ui_id[7] := get_ui_id($velocity_sld)
+		%ui_id[8] := get_ui_id($half_btn)
+		%ui_id[9] := get_ui_id($normal_btn)
+		%ui_id[10] := get_ui_id($double_btn)
+		%ui_id[11] := get_ui_id($grid_sld)
+		%ui_id[12] := get_ui_id($grid_up_btn)
+		%ui_id[13] := get_ui_id($grid_dn_btn)
+	
+	{Pictures}
+		set_control_par_str(%ui_id[1],$CONTROL_PAR_PICTURE,"header-play-btn")
+		set_control_par_str(%ui_id[2],$CONTROL_PAR_PICTURE,"header-mididrag-label")
+		set_control_par_str(%ui_id[3],$CONTROL_PAR_PICTURE,"header-preset-left-btn")
+		set_control_par_str(%ui_id[4],$CONTROL_PAR_PICTURE,"header-preset-right-btn")
+		set_control_par_str(%ui_id[5],$CONTROL_PAR_PICTURE,"panel-knob-big")
+		set_control_par_str(%ui_id[6],$CONTROL_PAR_PICTURE,"panel-knob-big")
+		set_control_par_str(%ui_id[7],$CONTROL_PAR_PICTURE,"panel-knob-big")
+		set_control_par_str(%ui_id[8],$CONTROL_PAR_PICTURE,"grooves-tempo-half-btn")
+		set_control_par_str(%ui_id[9],$CONTROL_PAR_PICTURE,"grooves-tempo-normal-btn")
+		set_control_par_str(%ui_id[10],$CONTROL_PAR_PICTURE,"grooves-tempo-double-btn")
+		set_control_par_str(%ui_id[11],$CONTROL_PAR_PICTURE,"grooves-grid-label")
+		set_control_par_str(%ui_id[12],$CONTROL_PAR_PICTURE,"grooves-grid-up-btn")
+		set_control_par_str(%ui_id[13],$CONTROL_PAR_PICTURE,"grooves-grid-down-btn")
+		{/Pictures}
+
+	{Mouse Behaviour}
+		set_control_par(%ui_id[5], $CONTROL_PAR_MOUSE_BEHAVIOUR, -500)
+		set_control_par(%ui_id[6], $CONTROL_PAR_MOUSE_BEHAVIOUR, -500)
+		set_control_par(%ui_id[7], $CONTROL_PAR_MOUSE_BEHAVIOUR, -500)
+		set_control_par(%ui_id[11], $CONTROL_PAR_MOUSE_BEHAVIOUR, -500)
+
+	{Font IDs & Text Position}
+		set_control_par(%ui_id[2], $CONTROL_PAR_FONT_TYPE, $FONT_ID)
+		set_control_par(%ui_id[2], $CONTROL_PAR_TEXTPOS_Y,8)
+
+	{Position}
+		set_control_par(%ui_id[0],$CONTROL_PAR_POS_X,15)
+		set_control_par(%ui_id[0],$CONTROL_PAR_POS_Y,259)
+		
+		set_control_par(%ui_id[1],$CONTROL_PAR_POS_X,566)
+		set_control_par(%ui_id[1],$CONTROL_PAR_POS_Y,12)
+		
+		set_control_par(%ui_id[2],$CONTROL_PAR_POS_X,431)
+		set_control_par(%ui_id[2],$CONTROL_PAR_POS_Y,43)
+		
+		set_control_par(%ui_id[3],$CONTROL_PAR_POS_X,587)
+		set_control_par(%ui_id[3],$CONTROL_PAR_POS_Y,41)
+		
+		set_control_par(%ui_id[4],$CONTROL_PAR_POS_X,603)
+		set_control_par(%ui_id[4],$CONTROL_PAR_POS_Y,41)
+		
+		set_control_par(%ui_id[5],$CONTROL_PAR_POS_X,37)
+		set_control_par(%ui_id[5],$CONTROL_PAR_POS_Y,485)
+
+		set_control_par(%ui_id[6],$CONTROL_PAR_POS_X,223)
+		set_control_par(%ui_id[6],$CONTROL_PAR_POS_Y,485)
+		
+		set_control_par(%ui_id[7],$CONTROL_PAR_POS_X,328)
+		set_control_par(%ui_id[7],$CONTROL_PAR_POS_Y,485)
+		
+		set_control_par(%ui_id[8],$CONTROL_PAR_POS_X,436)
+		set_control_par(%ui_id[8],$CONTROL_PAR_POS_Y,485)
+		
+		set_control_par(%ui_id[9],$CONTROL_PAR_POS_X,476)
+		set_control_par(%ui_id[9],$CONTROL_PAR_POS_Y,485)
+		
+		set_control_par(%ui_id[10],$CONTROL_PAR_POS_X,553)
+		set_control_par(%ui_id[10],$CONTROL_PAR_POS_Y,485)
+		
+		set_control_par(%ui_id[11],$CONTROL_PAR_POS_X,110)
+		set_control_par(%ui_id[11],$CONTROL_PAR_POS_Y,488)
+
+		set_control_par(%ui_id[12],$CONTROL_PAR_POS_X,169)
+		set_control_par(%ui_id[12],$CONTROL_PAR_POS_Y,486)
+		
+		set_control_par(%ui_id[13],$CONTROL_PAR_POS_X,169)
+		set_control_par(%ui_id[13],$CONTROL_PAR_POS_Y,498)
+
+	{Size}
+		set_control_par(%ui_id[0],$CONTROL_PAR_WIDTH,605)
+		set_control_par(%ui_id[0],$CONTROL_PAR_HEIGHT,188)
+		set_control_par(%ui_id[0],$CONTROL_PAR_COLUMN_WIDTH,200)
+		
+		set_control_par(%ui_id[1],$CONTROL_PAR_WIDTH,54)
+		set_control_par(%ui_id[1],$CONTROL_PAR_HEIGHT,29)
+		
+		set_control_par(%ui_id[2],$CONTROL_PAR_WIDTH,154)
+		set_control_par(%ui_id[2],$CONTROL_PAR_HEIGHT,18)
+		
+		set_control_par(%ui_id[3],$CONTROL_PAR_WIDTH,18)
+		set_control_par(%ui_id[3],$CONTROL_PAR_HEIGHT,24)
+		
+		set_control_par(%ui_id[4],$CONTROL_PAR_WIDTH,18)
+		set_control_par(%ui_id[4],$CONTROL_PAR_HEIGHT,24)
+		
+		set_control_par(%ui_id[5],$CONTROL_PAR_WIDTH,28)
+		set_control_par(%ui_id[5],$CONTROL_PAR_HEIGHT,42)
+
+		set_control_par(%ui_id[6],$CONTROL_PAR_WIDTH,14)
+		set_control_par(%ui_id[6],$CONTROL_PAR_HEIGHT,14)
+
+		set_control_par(%ui_id[7],$CONTROL_PAR_WIDTH,18)
+		set_control_par(%ui_id[7],$CONTROL_PAR_HEIGHT,18)
+		
+		set_control_par(%ui_id[8],$CONTROL_PAR_WIDTH,42)
+		set_control_par(%ui_id[8],$CONTROL_PAR_HEIGHT,29)
+		
+		set_control_par(%ui_id[9],$CONTROL_PAR_WIDTH,78)
+		set_control_par(%ui_id[9],$CONTROL_PAR_HEIGHT,29)
+		
+		set_control_par(%ui_id[10],$CONTROL_PAR_WIDTH,42)
+		set_control_par(%ui_id[10],$CONTROL_PAR_HEIGHT,29)
+		
+		set_control_par(%ui_id[11],$CONTROL_PAR_WIDTH,61)
+		set_control_par(%ui_id[11],$CONTROL_PAR_HEIGHT,23)
+		
+		set_control_par(%ui_id[12],$CONTROL_PAR_WIDTH,16)
+		set_control_par(%ui_id[12],$CONTROL_PAR_HEIGHT,13)
+		
+		set_control_par(%ui_id[13],$CONTROL_PAR_WIDTH,16)
+		set_control_par(%ui_id[13],$CONTROL_PAR_HEIGHT,13)
+
+	{Text}
+		set_control_par_str(%ui_id[1],$CONTROL_PAR_TEXT,"")
+		set_control_par_str(%ui_id[3],$CONTROL_PAR_TEXT,"")
+		set_control_par_str(%ui_id[4],$CONTROL_PAR_TEXT,"")
+		set_control_par_str(%ui_id[8],$CONTROL_PAR_TEXT,"")
+		set_control_par_str(%ui_id[9],$CONTROL_PAR_TEXT,"")
+		set_control_par_str(%ui_id[10],$CONTROL_PAR_TEXT,"")
+		set_control_par_str(%ui_id[12],$CONTROL_PAR_TEXT,"")
+		set_control_par_str(%ui_id[13],$CONTROL_PAR_TEXT,"")
+
+	{Help Text}
+		set_control_par_str(%ui_id[0],$CONTROL_PAR_HELP,"Groove Browser: The first column shows a list of Genre folders. The second column shows the list of Grooves and Fills availabhle for that Genre. The third column is a list of all Variations for the selected Groove of Fill. Double click a groove to select it.")
+		set_control_par_str(%ui_id[1],$CONTROL_PAR_HELP,"Play: Use this control to start or stop playback. Playback is always following host song position if available.")
+		set_control_par_str(%ui_id[2],$CONTROL_PAR_HELP,"Active Groove: This is the area where the active groove or fill is displayed at any time. This is also the area from which you can drag the groove to your host project.")
+		set_control_par_str(%ui_id[3],$CONTROL_PAR_HELP,"Previous Groove: Use this control to skip to the previous variation of the active groove or fill.")
+		set_control_par_str(%ui_id[4],$CONTROL_PAR_HELP,"Next Groove: Use this control to skip to the next variation of the active groove or fill.")
+		set_control_par_str(%ui_id[5],$CONTROL_PAR_HELP,"Tightness: Changes the amount of groove in the beat.  The center value is the original sounding played beat.  All the way to the right, the beat is completely quantized.  As the knob is turned to the left, the beat gets more and more loose until it sounds very sloppy when turned all the way to the left.")
+		set_control_par_str(%ui_id[6],$CONTROL_PAR_HELP,"Swing: Adjusts the amount of swing in the beat.  Swing allows for rhythmic shifting of a groove where the first note in a series plays longer than the one that follows.  When the knob is all the way to the right, the swing is the most severe, while the leftmost setting leaves the original MIDI groove unaffected.")
+		set_control_par_str(%ui_id[7],$CONTROL_PAR_HELP,"Velocity: Changes the range of the velocities in the grooves.  At the center position, the original groove is unaffected. As the knob is turned to the right, the range is compressed to the high range. Similarly, when the knob is turned to the left the velocities are compressed to the low range.")
+		set_control_par_str(%ui_id[8],$CONTROL_PAR_HELP,"Tempo: These buttons allow you to immediately change the tempo of the groove or fill to be half the speed or double the speed of the originals.  This can be useful when a song is recorded at a high BPM tempo, but the feel of the song is actually half of that speed (or vice versa).")
+		set_control_par_str(%ui_id[9],$CONTROL_PAR_HELP,"Tempo: These buttons allow you to immediately change the tempo of the groove or fill to be half the speed or double the speed of the originals.  This can be useful when a song is recorded at a high BPM tempo, but the feel of the song is actually half of that speed (or vice versa).")
+		set_control_par_str(%ui_id[10],$CONTROL_PAR_HELP,"Tempo: These buttons allow you to immediately change the tempo of the groove or fill to be half the speed or double the speed of the originals.  This can be useful when a song is recorded at a high BPM tempo, but the feel of the song is actually half of that speed (or vice versa).")
+		set_control_par_str(%ui_id[11],$CONTROL_PAR_HELP,"Grid: Set the grid for the Tightness & Swing controls.")
+		set_control_par_str(%ui_id[12],$CONTROL_PAR_HELP,"Grid: Set the grid for the Tightness & Swing controls.")
+		set_control_par_str(%ui_id[13],$CONTROL_PAR_HELP,"Grid: Set the grid for the Tightness & Swing controls.")
+
+	{Automation Names}
+		set_control_par_str(%ui_id[5],$CONTROL_PAR_AUTOMATION_NAME,"Tightness")
+		set_control_par_str(%ui_id[6],$CONTROL_PAR_AUTOMATION_NAME,"Swing")
+		set_control_par_str(%ui_id[7],$CONTROL_PAR_AUTOMATION_NAME,"Velocity")
+		set_control_par_str(%ui_id[11],$CONTROL_PAR_AUTOMATION_NAME,"Grid")
+
+	{Other}
+		set_control_par(%ui_id[0], $CONTROL_PAR_FILE_TYPE, $NI_FILE_TYPE_MIDI)
+		set_control_par_str(%ui_id[0], $CONTROL_PAR_BASEPATH, get_folder($GET_FOLDER_LIBRARY_DIR) & "MIDI Files")
+		{set_control_par_str(%ui_id[0], $CONTROL_PAR_BASEPATH, get_folder($GET_FOLDER_PATCH_DIR) & "MIDI Files")}
+		
+		set_control_par(%ui_id[2],$CONTROL_PAR_DND_BEHAVIOUR,1) 
+
+	{Default Values}
+		set_control_par(%ui_id[5], $CONTROL_PAR_DEFAULT_VALUE, 0)
+		set_control_par(%ui_id[6], $CONTROL_PAR_DEFAULT_VALUE, 0)
+		set_control_par(%ui_id[7], $CONTROL_PAR_DEFAULT_VALUE, 0)
+		set_control_par(%ui_id[11], $CONTROL_PAR_DEFAULT_VALUE, 2)
+
+{init}
+	make_persistent(@file_path)
+	make_persistent(@file_name)
+	make_persistent(@last_file_path)
+	make_persistent($grid_sld)
+	make_persistent($quantize_sld)
+	make_persistent($swing_sld)
+	make_persistent($velocity_sld)
+	make_persistent($half_btn)
+	make_persistent($normal_btn)
+	make_persistent($double_btn)
+	read_persistent_var(@file_path)
+	read_persistent_var(@file_name)
+	read_persistent_var(@last_file_path)
+	read_persistent_var($grid_sld)
+	read_persistent_var($quantize_sld)
+	read_persistent_var($swing_sld)
+	read_persistent_var($velocity_sld)
+	read_persistent_var($half_btn)
+	read_persistent_var($normal_btn)
+	read_persistent_var($double_btn)
+	$quant_resol := %quant_resol_transform[$grid_sld]
+	$swing_cycle := %swing_cycle_transform[$grid_sld]	
+	$quantize_sld := 0
+	$swing_sld := 0
+	$velocity_sld := 0
+	$half_btn := 0
+	$normal_btn := 1
+	$double_btn := 0
+	$swing_amount := $swing_sld
+	$quant_amount := $quantize_sld
+	if ($velocity_sld < 0)
+		$lower := 1
+		$higher := 127 + $velocity_sld
+	else
+		$lower := $velocity_sld
+		$higher := 127
+	end if
+
+	declare $first_time_ever_flag := 1
+	{make_persistent($first_time_ever_flag)
+	read_persistent_var($first_time_ever_flag)}
+	if ($first_time_ever_flag = 1)
+		@file_path := get_folder($GET_FOLDER_LIBRARY_DIR) & "MIDI Files/03 Fat/132bpm Driver/02 Hat Snare.mid"
+	end if
+
+	set_control_par_str(%ui_id[0], $CONTROL_PAR_FILEPATH, @file_path)
+	set_text($play_btn, "")
+	{/init}
+
+{MIDI VISUALIZATION}
+	declare %norm_vis_cursor_pos[576]
+	$a := 0
+	while ($a < num_elements(%norm_vis_cursor_pos))
+		%norm_vis_cursor_pos[$a] := $a
+		inc($a)
+	end while
+
+	declare %half_vis_cursor_pos[1152]
+	$a := 0
+	while ($a < num_elements(%half_vis_cursor_pos))
+		%half_vis_cursor_pos[$a] := $a / 2
+		inc($a)
+	end while
+
+	declare %double_vis_cursor_pos[576]
+	$a := 0
+	$b := 0
+	while ($a < num_elements(%double_vis_cursor_pos))
+		%double_vis_cursor_pos[$a] := $b * 2
+		if (%double_vis_cursor_pos[$a] = 576)
+			$b := 0
+		end if
+		inc($a)
+		inc($b)
+	end while
+
+    declare ui_label $kick_lbl_00(1,1)
+    declare ui_label $kick_lbl_01(1,1)
+    declare ui_label $kick_lbl_02(1,1)
+    declare ui_label $kick_lbl_03(1,1)
+    declare ui_label $kick_lbl_04(1,1)
+    declare ui_label $kick_lbl_05(1,1)
+    declare ui_label $kick_lbl_06(1,1)
+    declare ui_label $kick_lbl_07(1,1)
+    declare ui_label $kick_lbl_08(1,1)
+    declare ui_label $kick_lbl_09(1,1)
+    declare ui_label $kick_lbl_10(1,1)
+    declare ui_label $kick_lbl_11(1,1)
+    declare ui_label $kick_lbl_12(1,1)
+    declare ui_label $kick_lbl_13(1,1)
+    declare ui_label $kick_lbl_14(1,1)
+    declare ui_label $kick_lbl_15(1,1)
+    declare ui_label $kick_lbl_16(1,1)
+    declare ui_label $kick_lbl_17(1,1)
+    declare ui_label $kick_lbl_18(1,1)
+    declare ui_label $kick_lbl_19(1,1)
+    declare ui_label $kick_lbl_20(1,1)
+    declare ui_label $kick_lbl_21(1,1)
+    declare ui_label $kick_lbl_22(1,1)
+    declare ui_label $kick_lbl_23(1,1)
+    declare ui_label $kick_lbl_24(1,1)
+    declare ui_label $kick_lbl_25(1,1)
+    declare ui_label $kick_lbl_26(1,1)
+    declare ui_label $kick_lbl_27(1,1)
+    declare ui_label $kick_lbl_28(1,1)
+    declare ui_label $kick_lbl_29(1,1)
+    declare ui_label $kick_lbl_30(1,1)
+    declare ui_label $kick_lbl_31(1,1)
+    declare ui_label $snare_lbl_00(1,1)
+    declare ui_label $snare_lbl_01(1,1)
+    declare ui_label $snare_lbl_02(1,1)
+    declare ui_label $snare_lbl_03(1,1)
+    declare ui_label $snare_lbl_04(1,1)
+    declare ui_label $snare_lbl_05(1,1)
+    declare ui_label $snare_lbl_06(1,1)
+    declare ui_label $snare_lbl_07(1,1)
+    declare ui_label $snare_lbl_08(1,1)
+    declare ui_label $snare_lbl_09(1,1)
+    declare ui_label $snare_lbl_10(1,1)
+    declare ui_label $snare_lbl_11(1,1)
+    declare ui_label $snare_lbl_12(1,1)
+    declare ui_label $snare_lbl_13(1,1)
+    declare ui_label $snare_lbl_14(1,1)
+    declare ui_label $snare_lbl_15(1,1)
+    declare ui_label $snare_lbl_16(1,1)
+    declare ui_label $snare_lbl_17(1,1)
+    declare ui_label $snare_lbl_18(1,1)
+    declare ui_label $snare_lbl_19(1,1)
+    declare ui_label $snare_lbl_20(1,1)
+    declare ui_label $snare_lbl_21(1,1)
+    declare ui_label $snare_lbl_22(1,1)
+    declare ui_label $snare_lbl_23(1,1)
+    declare ui_label $snare_lbl_24(1,1)
+    declare ui_label $snare_lbl_25(1,1)
+    declare ui_label $snare_lbl_26(1,1)
+    declare ui_label $snare_lbl_27(1,1)
+    declare ui_label $snare_lbl_28(1,1)
+    declare ui_label $snare_lbl_29(1,1)
+    declare ui_label $snare_lbl_30(1,1)
+    declare ui_label $snare_lbl_31(1,1)
+    declare ui_label $hihat_lbl_00(1,1)
+    declare ui_label $hihat_lbl_01(1,1)
+    declare ui_label $hihat_lbl_02(1,1)
+    declare ui_label $hihat_lbl_03(1,1)
+    declare ui_label $hihat_lbl_04(1,1)
+    declare ui_label $hihat_lbl_05(1,1)
+    declare ui_label $hihat_lbl_06(1,1)
+    declare ui_label $hihat_lbl_07(1,1)
+    declare ui_label $hihat_lbl_08(1,1)
+    declare ui_label $hihat_lbl_09(1,1)
+    declare ui_label $hihat_lbl_10(1,1)
+    declare ui_label $hihat_lbl_11(1,1)
+    declare ui_label $hihat_lbl_12(1,1)
+    declare ui_label $hihat_lbl_13(1,1)
+    declare ui_label $hihat_lbl_14(1,1)
+    declare ui_label $hihat_lbl_15(1,1)
+    declare ui_label $hihat_lbl_16(1,1)
+    declare ui_label $hihat_lbl_17(1,1)
+    declare ui_label $hihat_lbl_18(1,1)
+    declare ui_label $hihat_lbl_19(1,1)
+    declare ui_label $hihat_lbl_20(1,1)
+    declare ui_label $hihat_lbl_21(1,1)
+    declare ui_label $hihat_lbl_22(1,1)
+    declare ui_label $hihat_lbl_23(1,1)
+    declare ui_label $hihat_lbl_24(1,1)
+    declare ui_label $hihat_lbl_25(1,1)
+    declare ui_label $hihat_lbl_26(1,1)
+    declare ui_label $hihat_lbl_27(1,1)
+    declare ui_label $hihat_lbl_28(1,1)
+    declare ui_label $hihat_lbl_29(1,1)
+    declare ui_label $hihat_lbl_30(1,1)
+    declare ui_label $hihat_lbl_31(1,1)
+    declare ui_label $toms_lbl_00(1,1)
+    declare ui_label $toms_lbl_01(1,1)
+    declare ui_label $toms_lbl_02(1,1)
+    declare ui_label $toms_lbl_03(1,1)
+    declare ui_label $toms_lbl_04(1,1)
+    declare ui_label $toms_lbl_05(1,1)
+    declare ui_label $toms_lbl_06(1,1)
+    declare ui_label $toms_lbl_07(1,1)
+    declare ui_label $toms_lbl_08(1,1)
+    declare ui_label $toms_lbl_09(1,1)
+    declare ui_label $toms_lbl_10(1,1)
+    declare ui_label $toms_lbl_11(1,1)
+    declare ui_label $toms_lbl_12(1,1)
+    declare ui_label $toms_lbl_13(1,1)
+    declare ui_label $toms_lbl_14(1,1)
+    declare ui_label $toms_lbl_15(1,1)
+    declare ui_label $toms_lbl_16(1,1)
+    declare ui_label $toms_lbl_17(1,1)
+    declare ui_label $toms_lbl_18(1,1)
+    declare ui_label $toms_lbl_19(1,1)
+    declare ui_label $toms_lbl_20(1,1)
+    declare ui_label $toms_lbl_21(1,1)
+    declare ui_label $toms_lbl_22(1,1)
+    declare ui_label $toms_lbl_23(1,1)
+    declare ui_label $toms_lbl_24(1,1)
+    declare ui_label $toms_lbl_25(1,1)
+    declare ui_label $toms_lbl_26(1,1)
+    declare ui_label $toms_lbl_27(1,1)
+    declare ui_label $toms_lbl_28(1,1)
+    declare ui_label $toms_lbl_29(1,1)
+    declare ui_label $toms_lbl_30(1,1)
+    declare ui_label $toms_lbl_31(1,1)
+    declare ui_label $perc_lbl_00(1,1)
+    declare ui_label $perc_lbl_01(1,1)
+    declare ui_label $perc_lbl_02(1,1)
+    declare ui_label $perc_lbl_03(1,1)
+    declare ui_label $perc_lbl_04(1,1)
+    declare ui_label $perc_lbl_05(1,1)
+    declare ui_label $perc_lbl_06(1,1)
+    declare ui_label $perc_lbl_07(1,1)
+    declare ui_label $perc_lbl_08(1,1)
+    declare ui_label $perc_lbl_09(1,1)
+    declare ui_label $perc_lbl_10(1,1)
+    declare ui_label $perc_lbl_11(1,1)
+    declare ui_label $perc_lbl_12(1,1)
+    declare ui_label $perc_lbl_13(1,1)
+    declare ui_label $perc_lbl_14(1,1)
+    declare ui_label $perc_lbl_15(1,1)
+    declare ui_label $perc_lbl_16(1,1)
+    declare ui_label $perc_lbl_17(1,1)
+    declare ui_label $perc_lbl_18(1,1)
+    declare ui_label $perc_lbl_19(1,1)
+    declare ui_label $perc_lbl_20(1,1)
+    declare ui_label $perc_lbl_21(1,1)
+    declare ui_label $perc_lbl_22(1,1)
+    declare ui_label $perc_lbl_23(1,1)
+    declare ui_label $perc_lbl_24(1,1)
+    declare ui_label $perc_lbl_25(1,1)
+    declare ui_label $perc_lbl_26(1,1)
+    declare ui_label $perc_lbl_27(1,1)
+    declare ui_label $perc_lbl_28(1,1)
+    declare ui_label $perc_lbl_29(1,1)
+    declare ui_label $perc_lbl_30(1,1)
+    declare ui_label $perc_lbl_31(1,1)
+    declare ui_label $ride_lbl_00(1,1)
+    declare ui_label $ride_lbl_01(1,1)
+    declare ui_label $ride_lbl_02(1,1)
+    declare ui_label $ride_lbl_03(1,1)
+    declare ui_label $ride_lbl_04(1,1)
+    declare ui_label $ride_lbl_05(1,1)
+    declare ui_label $ride_lbl_06(1,1)
+    declare ui_label $ride_lbl_07(1,1)
+    declare ui_label $ride_lbl_08(1,1)
+    declare ui_label $ride_lbl_09(1,1)
+    declare ui_label $ride_lbl_10(1,1)
+    declare ui_label $ride_lbl_11(1,1)
+    declare ui_label $ride_lbl_12(1,1)
+    declare ui_label $ride_lbl_13(1,1)
+    declare ui_label $ride_lbl_14(1,1)
+    declare ui_label $ride_lbl_15(1,1)
+    declare ui_label $ride_lbl_16(1,1)
+    declare ui_label $ride_lbl_17(1,1)
+    declare ui_label $ride_lbl_18(1,1)
+    declare ui_label $ride_lbl_19(1,1)
+    declare ui_label $ride_lbl_20(1,1)
+    declare ui_label $ride_lbl_21(1,1)
+    declare ui_label $ride_lbl_22(1,1)
+    declare ui_label $ride_lbl_23(1,1)
+    declare ui_label $ride_lbl_24(1,1)
+    declare ui_label $ride_lbl_25(1,1)
+    declare ui_label $ride_lbl_26(1,1)
+    declare ui_label $ride_lbl_27(1,1)
+    declare ui_label $ride_lbl_28(1,1)
+    declare ui_label $ride_lbl_29(1,1)
+    declare ui_label $ride_lbl_30(1,1)
+    declare ui_label $ride_lbl_31(1,1)
+    declare ui_label $cymb_lbl_00(1,1)
+    declare ui_label $cymb_lbl_01(1,1)
+    declare ui_label $cymb_lbl_02(1,1)
+    declare ui_label $cymb_lbl_03(1,1)
+    declare ui_label $cymb_lbl_04(1,1)
+    declare ui_label $cymb_lbl_05(1,1)
+    declare ui_label $cymb_lbl_06(1,1)
+    declare ui_label $cymb_lbl_07(1,1)
+    declare ui_label $cymb_lbl_08(1,1)
+    declare ui_label $cymb_lbl_09(1,1)
+    declare ui_label $cymb_lbl_10(1,1)
+    declare ui_label $cymb_lbl_11(1,1)
+    declare ui_label $cymb_lbl_12(1,1)
+    declare ui_label $cymb_lbl_13(1,1)
+    declare ui_label $cymb_lbl_14(1,1)
+    declare ui_label $cymb_lbl_15(1,1)
+    declare ui_label $cymb_lbl_16(1,1)
+    declare ui_label $cymb_lbl_17(1,1)
+    declare ui_label $cymb_lbl_18(1,1)
+    declare ui_label $cymb_lbl_19(1,1)
+    declare ui_label $cymb_lbl_20(1,1)
+    declare ui_label $cymb_lbl_21(1,1)
+    declare ui_label $cymb_lbl_22(1,1)
+    declare ui_label $cymb_lbl_23(1,1)
+    declare ui_label $cymb_lbl_24(1,1)
+    declare ui_label $cymb_lbl_25(1,1)
+    declare ui_label $cymb_lbl_26(1,1)
+    declare ui_label $cymb_lbl_27(1,1)
+    declare ui_label $cymb_lbl_28(1,1)
+    declare ui_label $cymb_lbl_29(1,1)
+    declare ui_label $cymb_lbl_30(1,1)
+    declare ui_label $cymb_lbl_31(1,1)
+
+    declare %midi_lbl_id[224]
+    %midi_lbl_id[000] := get_ui_id($kick_lbl_00)
+    %midi_lbl_id[001] := get_ui_id($kick_lbl_01)
+    %midi_lbl_id[002] := get_ui_id($kick_lbl_02)
+    %midi_lbl_id[003] := get_ui_id($kick_lbl_03)
+    %midi_lbl_id[004] := get_ui_id($kick_lbl_04)
+    %midi_lbl_id[005] := get_ui_id($kick_lbl_05)
+    %midi_lbl_id[006] := get_ui_id($kick_lbl_06)
+    %midi_lbl_id[007] := get_ui_id($kick_lbl_07)
+    %midi_lbl_id[008] := get_ui_id($kick_lbl_08)
+    %midi_lbl_id[009] := get_ui_id($kick_lbl_09)
+    %midi_lbl_id[010] := get_ui_id($kick_lbl_10)
+    %midi_lbl_id[011] := get_ui_id($kick_lbl_11)
+    %midi_lbl_id[012] := get_ui_id($kick_lbl_12)
+    %midi_lbl_id[013] := get_ui_id($kick_lbl_13)
+    %midi_lbl_id[014] := get_ui_id($kick_lbl_14)
+    %midi_lbl_id[015] := get_ui_id($kick_lbl_15)
+    %midi_lbl_id[016] := get_ui_id($kick_lbl_16)
+    %midi_lbl_id[017] := get_ui_id($kick_lbl_17)
+    %midi_lbl_id[018] := get_ui_id($kick_lbl_18)
+    %midi_lbl_id[019] := get_ui_id($kick_lbl_19)
+    %midi_lbl_id[020] := get_ui_id($kick_lbl_20)
+    %midi_lbl_id[021] := get_ui_id($kick_lbl_21)
+    %midi_lbl_id[022] := get_ui_id($kick_lbl_22)
+    %midi_lbl_id[023] := get_ui_id($kick_lbl_23)
+    %midi_lbl_id[024] := get_ui_id($kick_lbl_24)
+    %midi_lbl_id[025] := get_ui_id($kick_lbl_25)
+    %midi_lbl_id[026] := get_ui_id($kick_lbl_26)
+    %midi_lbl_id[027] := get_ui_id($kick_lbl_27)
+    %midi_lbl_id[028] := get_ui_id($kick_lbl_28)
+    %midi_lbl_id[029] := get_ui_id($kick_lbl_29)
+    %midi_lbl_id[030] := get_ui_id($kick_lbl_30)
+    %midi_lbl_id[031] := get_ui_id($kick_lbl_31)
+    %midi_lbl_id[032] := get_ui_id($snare_lbl_00)
+    %midi_lbl_id[033] := get_ui_id($snare_lbl_01)
+    %midi_lbl_id[034] := get_ui_id($snare_lbl_02)
+    %midi_lbl_id[035] := get_ui_id($snare_lbl_03)
+    %midi_lbl_id[036] := get_ui_id($snare_lbl_04)
+    %midi_lbl_id[037] := get_ui_id($snare_lbl_05)
+    %midi_lbl_id[038] := get_ui_id($snare_lbl_06)
+    %midi_lbl_id[039] := get_ui_id($snare_lbl_07)
+    %midi_lbl_id[040] := get_ui_id($snare_lbl_08)
+    %midi_lbl_id[041] := get_ui_id($snare_lbl_09)
+    %midi_lbl_id[042] := get_ui_id($snare_lbl_10)
+    %midi_lbl_id[043] := get_ui_id($snare_lbl_11)
+    %midi_lbl_id[044] := get_ui_id($snare_lbl_12)
+    %midi_lbl_id[045] := get_ui_id($snare_lbl_13)
+    %midi_lbl_id[046] := get_ui_id($snare_lbl_14)
+    %midi_lbl_id[047] := get_ui_id($snare_lbl_15)
+    %midi_lbl_id[048] := get_ui_id($snare_lbl_16)
+    %midi_lbl_id[049] := get_ui_id($snare_lbl_17)
+    %midi_lbl_id[050] := get_ui_id($snare_lbl_18)
+    %midi_lbl_id[051] := get_ui_id($snare_lbl_19)
+    %midi_lbl_id[052] := get_ui_id($snare_lbl_20)
+    %midi_lbl_id[053] := get_ui_id($snare_lbl_21)
+    %midi_lbl_id[054] := get_ui_id($snare_lbl_22)
+    %midi_lbl_id[055] := get_ui_id($snare_lbl_23)
+    %midi_lbl_id[056] := get_ui_id($snare_lbl_24)
+    %midi_lbl_id[057] := get_ui_id($snare_lbl_25)
+    %midi_lbl_id[058] := get_ui_id($snare_lbl_26)
+    %midi_lbl_id[059] := get_ui_id($snare_lbl_27)
+    %midi_lbl_id[060] := get_ui_id($snare_lbl_28)
+    %midi_lbl_id[061] := get_ui_id($snare_lbl_29)
+    %midi_lbl_id[062] := get_ui_id($snare_lbl_30)
+    %midi_lbl_id[063] := get_ui_id($snare_lbl_31)
+    %midi_lbl_id[064] := get_ui_id($hihat_lbl_00)
+    %midi_lbl_id[065] := get_ui_id($hihat_lbl_01)
+    %midi_lbl_id[066] := get_ui_id($hihat_lbl_02)
+    %midi_lbl_id[067] := get_ui_id($hihat_lbl_03)
+    %midi_lbl_id[068] := get_ui_id($hihat_lbl_04)
+    %midi_lbl_id[069] := get_ui_id($hihat_lbl_05)
+    %midi_lbl_id[070] := get_ui_id($hihat_lbl_06)
+    %midi_lbl_id[071] := get_ui_id($hihat_lbl_07)
+    %midi_lbl_id[072] := get_ui_id($hihat_lbl_08)
+    %midi_lbl_id[073] := get_ui_id($hihat_lbl_09)
+    %midi_lbl_id[074] := get_ui_id($hihat_lbl_10)
+    %midi_lbl_id[075] := get_ui_id($hihat_lbl_11)
+    %midi_lbl_id[076] := get_ui_id($hihat_lbl_12)
+    %midi_lbl_id[077] := get_ui_id($hihat_lbl_13)
+    %midi_lbl_id[078] := get_ui_id($hihat_lbl_14)
+    %midi_lbl_id[079] := get_ui_id($hihat_lbl_15)
+    %midi_lbl_id[080] := get_ui_id($hihat_lbl_16)
+    %midi_lbl_id[081] := get_ui_id($hihat_lbl_17)
+    %midi_lbl_id[082] := get_ui_id($hihat_lbl_18)
+    %midi_lbl_id[083] := get_ui_id($hihat_lbl_19)
+    %midi_lbl_id[084] := get_ui_id($hihat_lbl_20)
+    %midi_lbl_id[085] := get_ui_id($hihat_lbl_21)
+    %midi_lbl_id[086] := get_ui_id($hihat_lbl_22)
+    %midi_lbl_id[087] := get_ui_id($hihat_lbl_23)
+    %midi_lbl_id[088] := get_ui_id($hihat_lbl_24)
+    %midi_lbl_id[089] := get_ui_id($hihat_lbl_25)
+    %midi_lbl_id[090] := get_ui_id($hihat_lbl_26)
+    %midi_lbl_id[091] := get_ui_id($hihat_lbl_27)
+    %midi_lbl_id[092] := get_ui_id($hihat_lbl_28)
+    %midi_lbl_id[093] := get_ui_id($hihat_lbl_29)
+    %midi_lbl_id[094] := get_ui_id($hihat_lbl_30)
+    %midi_lbl_id[095] := get_ui_id($hihat_lbl_31)
+    %midi_lbl_id[096] := get_ui_id($toms_lbl_00)
+    %midi_lbl_id[097] := get_ui_id($toms_lbl_01)
+    %midi_lbl_id[098] := get_ui_id($toms_lbl_02)
+    %midi_lbl_id[099] := get_ui_id($toms_lbl_03)
+    %midi_lbl_id[100] := get_ui_id($toms_lbl_04)
+    %midi_lbl_id[101] := get_ui_id($toms_lbl_05)
+    %midi_lbl_id[102] := get_ui_id($toms_lbl_06)
+    %midi_lbl_id[103] := get_ui_id($toms_lbl_07)
+    %midi_lbl_id[104] := get_ui_id($toms_lbl_08)
+    %midi_lbl_id[105] := get_ui_id($toms_lbl_09)
+    %midi_lbl_id[106] := get_ui_id($toms_lbl_10)
+    %midi_lbl_id[107] := get_ui_id($toms_lbl_11)
+    %midi_lbl_id[108] := get_ui_id($toms_lbl_12)
+    %midi_lbl_id[109] := get_ui_id($toms_lbl_13)
+    %midi_lbl_id[110] := get_ui_id($toms_lbl_14)
+    %midi_lbl_id[111] := get_ui_id($toms_lbl_15)
+    %midi_lbl_id[112] := get_ui_id($toms_lbl_16)
+    %midi_lbl_id[113] := get_ui_id($toms_lbl_17)
+    %midi_lbl_id[114] := get_ui_id($toms_lbl_18)
+    %midi_lbl_id[115] := get_ui_id($toms_lbl_19)
+    %midi_lbl_id[116] := get_ui_id($toms_lbl_20)
+    %midi_lbl_id[117] := get_ui_id($toms_lbl_21)
+    %midi_lbl_id[118] := get_ui_id($toms_lbl_22)
+    %midi_lbl_id[119] := get_ui_id($toms_lbl_23)
+    %midi_lbl_id[120] := get_ui_id($toms_lbl_24)
+    %midi_lbl_id[121] := get_ui_id($toms_lbl_25)
+    %midi_lbl_id[122] := get_ui_id($toms_lbl_26)
+    %midi_lbl_id[123] := get_ui_id($toms_lbl_27)
+    %midi_lbl_id[124] := get_ui_id($toms_lbl_28)
+    %midi_lbl_id[125] := get_ui_id($toms_lbl_29)
+    %midi_lbl_id[126] := get_ui_id($toms_lbl_30)
+    %midi_lbl_id[127] := get_ui_id($toms_lbl_31)
+    %midi_lbl_id[128] := get_ui_id($perc_lbl_00)
+    %midi_lbl_id[129] := get_ui_id($perc_lbl_01)
+    %midi_lbl_id[130] := get_ui_id($perc_lbl_02)
+    %midi_lbl_id[131] := get_ui_id($perc_lbl_03)
+    %midi_lbl_id[132] := get_ui_id($perc_lbl_04)
+    %midi_lbl_id[133] := get_ui_id($perc_lbl_05)
+    %midi_lbl_id[134] := get_ui_id($perc_lbl_06)
+    %midi_lbl_id[135] := get_ui_id($perc_lbl_07)
+    %midi_lbl_id[136] := get_ui_id($perc_lbl_08)
+    %midi_lbl_id[137] := get_ui_id($perc_lbl_09)
+    %midi_lbl_id[138] := get_ui_id($perc_lbl_10)
+    %midi_lbl_id[139] := get_ui_id($perc_lbl_11)
+    %midi_lbl_id[140] := get_ui_id($perc_lbl_12)
+    %midi_lbl_id[141] := get_ui_id($perc_lbl_13)
+    %midi_lbl_id[142] := get_ui_id($perc_lbl_14)
+    %midi_lbl_id[143] := get_ui_id($perc_lbl_15)
+    %midi_lbl_id[144] := get_ui_id($perc_lbl_16)
+    %midi_lbl_id[145] := get_ui_id($perc_lbl_17)
+    %midi_lbl_id[146] := get_ui_id($perc_lbl_18)
+    %midi_lbl_id[147] := get_ui_id($perc_lbl_19)
+    %midi_lbl_id[148] := get_ui_id($perc_lbl_20)
+    %midi_lbl_id[149] := get_ui_id($perc_lbl_21)
+    %midi_lbl_id[150] := get_ui_id($perc_lbl_22)
+    %midi_lbl_id[151] := get_ui_id($perc_lbl_23)
+    %midi_lbl_id[152] := get_ui_id($perc_lbl_24)
+    %midi_lbl_id[153] := get_ui_id($perc_lbl_25)
+    %midi_lbl_id[154] := get_ui_id($perc_lbl_26)
+    %midi_lbl_id[155] := get_ui_id($perc_lbl_27)
+    %midi_lbl_id[156] := get_ui_id($perc_lbl_28)
+    %midi_lbl_id[157] := get_ui_id($perc_lbl_29)
+    %midi_lbl_id[158] := get_ui_id($perc_lbl_30)
+    %midi_lbl_id[159] := get_ui_id($perc_lbl_31)
+    %midi_lbl_id[160] := get_ui_id($ride_lbl_00)
+    %midi_lbl_id[161] := get_ui_id($ride_lbl_01)
+    %midi_lbl_id[162] := get_ui_id($ride_lbl_02)
+    %midi_lbl_id[163] := get_ui_id($ride_lbl_03)
+    %midi_lbl_id[164] := get_ui_id($ride_lbl_04)
+    %midi_lbl_id[165] := get_ui_id($ride_lbl_05)
+    %midi_lbl_id[166] := get_ui_id($ride_lbl_06)
+    %midi_lbl_id[167] := get_ui_id($ride_lbl_07)
+    %midi_lbl_id[168] := get_ui_id($ride_lbl_08)
+    %midi_lbl_id[169] := get_ui_id($ride_lbl_09)
+    %midi_lbl_id[170] := get_ui_id($ride_lbl_10)
+    %midi_lbl_id[171] := get_ui_id($ride_lbl_11)
+    %midi_lbl_id[172] := get_ui_id($ride_lbl_12)
+    %midi_lbl_id[173] := get_ui_id($ride_lbl_13)
+    %midi_lbl_id[174] := get_ui_id($ride_lbl_14)
+    %midi_lbl_id[175] := get_ui_id($ride_lbl_15)
+    %midi_lbl_id[176] := get_ui_id($ride_lbl_16)
+    %midi_lbl_id[177] := get_ui_id($ride_lbl_17)
+    %midi_lbl_id[178] := get_ui_id($ride_lbl_18)
+    %midi_lbl_id[179] := get_ui_id($ride_lbl_19)
+    %midi_lbl_id[180] := get_ui_id($ride_lbl_20)
+    %midi_lbl_id[181] := get_ui_id($ride_lbl_21)
+    %midi_lbl_id[182] := get_ui_id($ride_lbl_22)
+    %midi_lbl_id[183] := get_ui_id($ride_lbl_23)
+    %midi_lbl_id[184] := get_ui_id($ride_lbl_24)
+    %midi_lbl_id[185] := get_ui_id($ride_lbl_25)
+    %midi_lbl_id[186] := get_ui_id($ride_lbl_26)
+    %midi_lbl_id[187] := get_ui_id($ride_lbl_27)
+    %midi_lbl_id[188] := get_ui_id($ride_lbl_28)
+    %midi_lbl_id[189] := get_ui_id($ride_lbl_29)
+    %midi_lbl_id[190] := get_ui_id($ride_lbl_30)
+    %midi_lbl_id[191] := get_ui_id($ride_lbl_31)
+    %midi_lbl_id[192] := get_ui_id($cymb_lbl_00)
+    %midi_lbl_id[193] := get_ui_id($cymb_lbl_01)
+    %midi_lbl_id[194] := get_ui_id($cymb_lbl_02)
+    %midi_lbl_id[195] := get_ui_id($cymb_lbl_03)
+    %midi_lbl_id[196] := get_ui_id($cymb_lbl_04)
+    %midi_lbl_id[197] := get_ui_id($cymb_lbl_05)
+    %midi_lbl_id[198] := get_ui_id($cymb_lbl_06)
+    %midi_lbl_id[199] := get_ui_id($cymb_lbl_07)
+    %midi_lbl_id[200] := get_ui_id($cymb_lbl_08)
+    %midi_lbl_id[201] := get_ui_id($cymb_lbl_09)
+    %midi_lbl_id[202] := get_ui_id($cymb_lbl_10)
+    %midi_lbl_id[203] := get_ui_id($cymb_lbl_11)
+    %midi_lbl_id[204] := get_ui_id($cymb_lbl_12)
+    %midi_lbl_id[205] := get_ui_id($cymb_lbl_13)
+    %midi_lbl_id[206] := get_ui_id($cymb_lbl_14)
+    %midi_lbl_id[207] := get_ui_id($cymb_lbl_15)
+    %midi_lbl_id[208] := get_ui_id($cymb_lbl_16)
+    %midi_lbl_id[209] := get_ui_id($cymb_lbl_17)
+    %midi_lbl_id[210] := get_ui_id($cymb_lbl_18)
+    %midi_lbl_id[211] := get_ui_id($cymb_lbl_19)
+    %midi_lbl_id[212] := get_ui_id($cymb_lbl_20)
+    %midi_lbl_id[213] := get_ui_id($cymb_lbl_21)
+    %midi_lbl_id[214] := get_ui_id($cymb_lbl_22)
+    %midi_lbl_id[215] := get_ui_id($cymb_lbl_23)
+    %midi_lbl_id[216] := get_ui_id($cymb_lbl_24)
+    %midi_lbl_id[217] := get_ui_id($cymb_lbl_25)
+    %midi_lbl_id[218] := get_ui_id($cymb_lbl_26)
+    %midi_lbl_id[219] := get_ui_id($cymb_lbl_27)
+    %midi_lbl_id[220] := get_ui_id($cymb_lbl_28)
+    %midi_lbl_id[221] := get_ui_id($cymb_lbl_29)
+    %midi_lbl_id[222] := get_ui_id($cymb_lbl_30)
+    %midi_lbl_id[223] := get_ui_id($cymb_lbl_31)
+
+    $count_3 := 0
+    while ($count_3 < num_elements(%midi_lbl_id) )
+        set_control_par_str(%midi_lbl_id[$count_3], $CONTROL_PAR_TEXT, "")
+        set_control_par_str(%midi_lbl_id[$count_3], $CONTROL_PAR_PICTURE, "grooves-dots")
+        set_control_par_str(%midi_lbl_id[$count_3], $CONTROL_PAR_HELP, "The velocities of the loaded MIDI File")
+            set_control_par(%midi_lbl_id[$count_3], $CONTROL_PAR_WIDTH, 18)
+            set_control_par(%midi_lbl_id[$count_3], $CONTROL_PAR_HEIGHT,18)
+            set_control_par(%midi_lbl_id[$count_3], $CONTROL_PAR_POS_X, 25 + 18 * ($count_3 mod 32)) 
+            set_control_par(%midi_lbl_id[$count_3], $CONTROL_PAR_POS_Y, 95 + 18 * ((223 - $count_3) / 32) )
+        inc($count_3)
+    end while
+
+    declare ui_label $cursor_lbl(1,1)
+	declare $cursor_id
+	$cursor_id := get_ui_id($cursor_lbl)
+	set_control_par_str($cursor_id, $CONTROL_PAR_TEXT, "")
+	set_control_par_str($cursor_id, $CONTROL_PAR_PICTURE, "grooves-playhead")
+	    set_control_par($cursor_id, $CONTROL_PAR_WIDTH,  16)
+	    set_control_par($cursor_id, $CONTROL_PAR_HEIGHT, 8)
+	    set_control_par($cursor_id, $CONTROL_PAR_POS_X,  21 ) 
+	    set_control_par($cursor_id, $CONTROL_PAR_POS_Y,  90 )
+	    {set_control_par($cursor_id, $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)}
+
+{Mapping}
+	declare %inverse_mapping_data[128]
+	make_persistent(%inverse_mapping_data)
+	
+	declare %default_mapping_data[128] := (-1)
+			{%default_mapping_data[22] := 78}		{CHOKE 1-5}
+			{%default_mapping_data[23] := 88
+			%default_mapping_data[24] := 83
+			%default_mapping_data[25] := 78}
+			%default_mapping_data[35] := 1 		{kick}
+			%default_mapping_data[36] := 1 		{kick}
+			%default_mapping_data[37] := 0 		{kick}
+			%default_mapping_data[38] := 4 		{snare center}
+			%default_mapping_data[39] := 11 	{snare rimshot}
+			%default_mapping_data[40] := 7 		{snare halway}
+			%default_mapping_data[41] := 10 	{TOM 3}
+			%default_mapping_data[42] := 23 	{hihat}
+			%default_mapping_data[43] := 54 	{TOM 3}
+			%default_mapping_data[44] := 29 	{hihat}
+			%default_mapping_data[45] := 47 	{TOM 2}
+			%default_mapping_data[46] := 31 	{hihat controller}
+			%default_mapping_data[47] := 40 	{TOM 1}
+			%default_mapping_data[48] := 76 	{Crash 1 - High EDGE}
+			%default_mapping_data[49] := 75 	{Crash 1 - High TIP}
+			%default_mapping_data[50] := 81 	{Crash 2 - Low EDGE}
+			%default_mapping_data[51] := 80 	{Crash 2 - Low TIP}
+			%default_mapping_data[52] := 85 	{Crash 3 RIDE BELL}
+			%default_mapping_data[53] := 86 	{Crash 3 RIDE TIP}
+			%default_mapping_data[54] := 23 	{hihat}
+			%default_mapping_data[55] := 33 	{hihat}
+			%default_mapping_data[56] := 26 	{hihat}
+			%default_mapping_data[57] := 35 	{hihat}
+			%default_mapping_data[58] := 30 	{hihat}
+			%default_mapping_data[59] := 0 		{kick}
+			%default_mapping_data[60] := 0 		{kick}
+			%default_mapping_data[61] := 1 		{kick}
+			%default_mapping_data[62] := 12 	{snare Kang}
+			%default_mapping_data[63] := 13 	{snare SHOT}
+			%default_mapping_data[64] := 14 	{Snare MUTED}
+			%default_mapping_data[65] := 107 	{* Perc A}
+			%default_mapping_data[66] := 108 	{* Perc A}
+			%default_mapping_data[67] := 111 	{* Perc B}
+			%default_mapping_data[68] := 112 	{* Perc B}
+			%default_mapping_data[69] := 115 	{* Perc C}
+			%default_mapping_data[70] := 116 	{* Perc C}
+			%default_mapping_data[71] := 118 	{* Perc D}
+			%default_mapping_data[72] := 121 	{* Perc E}
+			%default_mapping_data[73] := 122 	{* Perc E}
+
+{Control Group "Sound Preset"}
+
+{Map MIDI Groove to Note}
+	declare ui_switch $map_to_NOTE
+    set_control_par_str(get_ui_id($map_to_NOTE), $CONTROL_PAR_TEXT, "")
+    set_control_par_str(get_ui_id($map_to_NOTE), $CONTROL_PAR_PICTURE, "grooves-maptonote-cancel-btn")
+    set_control_par_str(get_ui_id($map_to_NOTE), $CONTROL_PAR_HELP, "Map to Note: Use this control to map a loaded MIDI Groove into a note slot from C-1 to B-1. Option-Click deletes all loaded and key-assigned MIDI Grooves(cannot be undone).")
+        set_control_par(get_ui_id($map_to_NOTE), $CONTROL_PAR_WIDTH,  81)
+        set_control_par(get_ui_id($map_to_NOTE), $CONTROL_PAR_HEIGHT, 23)
+        set_control_par(get_ui_id($map_to_NOTE), $CONTROL_PAR_POS_X,  536) 
+        set_control_par(get_ui_id($map_to_NOTE), $CONTROL_PAR_POS_Y,  233)
+
+    make_persistent($map_to_NOTE)
+    read_persistent_var($map_to_NOTE)
+
+    declare ui_label $note_mapping_bg(1,1)
+    declare $note_mapping_bg_id
+	$note_mapping_bg_id := get_ui_id($note_mapping_bg)
+    set_control_par_str($note_mapping_bg_id, $CONTROL_PAR_TEXT, "")
+    set_control_par_str($note_mapping_bg_id, $CONTROL_PAR_PICTURE, "grooves-maptonote-bg")
+        set_control_par($note_mapping_bg_id, $CONTROL_PAR_WIDTH,  16)
+        set_control_par($note_mapping_bg_id, $CONTROL_PAR_HEIGHT, 8)
+        set_control_par($note_mapping_bg_id, $CONTROL_PAR_POS_X,  14 ) 
+        set_control_par($note_mapping_bg_id, $CONTROL_PAR_POS_Y,  230 )
+        set_control_par($note_mapping_bg_id, $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+    
+{GUI Keyboard}
+	declare const $NUM_kb_NOTES	:= 12
+	declare const $KB_X_POS		:= 190
+	declare const $KB_Y_POS		:= 220
+
+	declare $kb_count_1
+
+	declare ui_switch $C_1
+	declare ui_switch $D_1
+	declare ui_switch $E_1
+	declare ui_switch $F_1
+	declare ui_switch $G_1
+	declare ui_switch $A_1
+	declare ui_switch $B_1
+	
+	declare ui_switch $Cshrp_1
+	declare ui_switch $Dshrp_1
+	declare ui_switch $Fshrp_1
+	declare ui_switch $Gshrp_1
+	declare ui_switch $Ashrp_1
+		
+	declare %kb_id[$NUM_kb_NOTES]
+			%kb_id[00] := get_ui_id($C_1)
+			%kb_id[01] := get_ui_id($D_1)
+			%kb_id[02] := get_ui_id($E_1)
+			%kb_id[03] := get_ui_id($F_1)
+			%kb_id[04] := get_ui_id($G_1)
+			%kb_id[05] := get_ui_id($A_1)
+			%kb_id[06] := get_ui_id($B_1)
+			%kb_id[07] := get_ui_id($Cshrp_1)
+			%kb_id[08] := get_ui_id($Dshrp_1)
+			%kb_id[09] := get_ui_id($Fshrp_1)
+			%kb_id[10] := get_ui_id($Gshrp_1)
+			%kb_id[11] := get_ui_id($Ashrp_1)
+
+	declare %kb_coloring_id[$NUM_kb_NOTES]
+			%kb_coloring_id[00] := get_ui_id($C_1)
+			%kb_coloring_id[01] := get_ui_id($Cshrp_1)
+			%kb_coloring_id[02] := get_ui_id($D_1)
+			%kb_coloring_id[03] := get_ui_id($Dshrp_1)
+			%kb_coloring_id[04] := get_ui_id($E_1)
+			%kb_coloring_id[05] := get_ui_id($F_1)
+			%kb_coloring_id[06] := get_ui_id($Fshrp_1)
+			%kb_coloring_id[07] := get_ui_id($G_1)
+			%kb_coloring_id[08] := get_ui_id($Gshrp_1)
+			%kb_coloring_id[09] := get_ui_id($A_1)
+			%kb_coloring_id[10] := get_ui_id($Ashrp_1)
+			%kb_coloring_id[11] := get_ui_id($B_1)
+
+
+
+	
+	declare !kb_pics[$NUM_kb_NOTES]
+	
+	$kb_count_1 := 0
+	while ($kb_count_1 < 12)
+		if ($kb_count_1 < 7)
+			if ($kb_count_1 = 0 or $kb_count_1 = 3)
+				!kb_pics[$kb_count_1] := "keyboard-CF-btn"		
+			end if
+			if ($kb_count_1 = 1)
+				!kb_pics[$kb_count_1] := "keyboard-D-btn"		
+			end if
+			if ($kb_count_1 = 2 or $kb_count_1 = 6)
+				!kb_pics[$kb_count_1] := "keyboard-EB-btn"		
+			end if
+			if ($kb_count_1 = 4)
+				!kb_pics[$kb_count_1] := "keyboard-G-btn"		
+			end if
+			if ($kb_count_1 = 5)
+				!kb_pics[$kb_count_1] := "keyboard-A-btn"		
+			end if
+		else
+			!kb_pics[$kb_count_1] := "keyboard-black-btn"
+		end if
+		inc($kb_count_1)
+	end while
+	
+	declare  !kb_txt[$NUM_kb_NOTES]
+	declare !kb_help[$NUM_kb_NOTES]
+	$kb_count_1 := 0
+	while ($kb_count_1 < 12)
+		 !kb_txt[$kb_count_1] := ""
+		!kb_help[$kb_count_1] := "Click on a note to change the instrument or articulation"
+		inc($kb_count_1)
+	end while
+
+	declare %kb_CONTROL_PAR[$NUM_kb_NOTES * 07] := (...
+			   {X}  {Y}  {W}  {H}  {DfVl} {Hde}  {AUTO}...
+	{00-C1}	   45,  93,  25,  100,  1,     0,     1,...
+	{01-D1}	   68,  93,  25,  100,  1,     0,     1,...
+	{02-E1}	   91,  93,  25,  100,  1,     0,     1,...
+	{03-F1}   114,  93,  25,  100,  1,     0,     1,...
+	{04-G1}   137,  93,  25,  100,  1,     0,     1,...
+	{05-A1}   160,  93,  25,  100,  1,     0,     1,...
+	{06-B1}   183,  93,  25,  100,  1,     0,     1,...
+	{07-C#1}   59,  93,  15,   57,  0,     0,     1,...
+	{08-D#1}   88,  93,  15,   57,  0,     0,     1,...
+	{09-F#1}  128,  93,  15,   57,  0,     0,     1,...
+	{10-G#1}  154,  93,  15,   57,  0,     0,     1,...
+	{11-A#1}  180,  93,  15,   57,  0,     0,     1)
+
+	declare %kb_GUI_remap[12] := (...  
+								{C  C#   D  D#   E   F  F#   G  G#   A  A#   B}...
+								 0, 07,  1, 08,  2,  3, 09,  4, 10,  5, 11,  6)
+
+
+	$kb_count_1 := 0
+	while ($kb_count_1 < $NUM_kb_NOTES)
+	set_control_par_str(%kb_id[$kb_count_1],$CONTROL_PAR_PICTURE,        !kb_pics[$kb_count_1])
+	set_control_par_str(%kb_id[$kb_count_1],$CONTROL_PAR_HELP,           !kb_help[$kb_count_1])
+	set_control_par_str(%kb_id[$kb_count_1],$CONTROL_PAR_TEXT,           "")
+		set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_FONT_TYPE, 	  $FONT_ID)
+		set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_POS_X,           %kb_CONTROL_PAR[00 + ($kb_count_1 * 07)] + $KB_X_POS)
+		set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_POS_Y,           %kb_CONTROL_PAR[01 + ($kb_count_1 * 07)] + $KB_Y_POS)
+		set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_WIDTH,           %kb_CONTROL_PAR[02 + ($kb_count_1 * 07)])
+		set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_HEIGHT,          %kb_CONTROL_PAR[03 + ($kb_count_1 * 07)])
+		set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_DEFAULT_VALUE,   %kb_CONTROL_PAR[04 + ($kb_count_1 * 07)])
+		set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_HIDE,            %kb_CONTROL_PAR[05 + ($kb_count_1 * 07)])
+		set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_ALLOW_AUTOMATION,%kb_CONTROL_PAR[06 + ($kb_count_1 * 07)])
+		set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_TEXT_ALIGNMENT,  4)
+		set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_TEXTPOS_Y,      77)
+	inc($kb_count_1)
+	end while
+
+	if ($map_to_NOTE = 1)
+		set_control_par(%ui_id[0],$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+		set_control_par($note_mapping_bg_id, $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+		$kb_count_1 := 0
+		while ($kb_count_1 < num_elements(%kb_id))
+			set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)	
+			inc($kb_count_1)
+		end while
+	else
+		set_control_par(%ui_id[0],$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+		set_control_par($note_mapping_bg_id, $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+		$kb_count_1 := 0
+		while ($kb_count_1 < num_elements(%kb_id))
+			set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)	
+			inc($kb_count_1)
+		end while
+	end if
+
+{SOUND PRESET SYSTEM & CATEGORY MENU}
+	{CATEGORY MENU}
+
+		declare const $NUM_CATEGORIES		:= 7
+		declare const $CAT_X_OFFSET			:= 100
+		declare const $NUM_PRESET_CONTROLS	:= 11
+
+		declare $arr_counter
+		declare $arr_count_1
+		declare $arr_count_2
+		declare $arr_count_3
+		declare $preset_helper
+		declare $num_userpresets_id
+		declare @empty_preset_text
+		
+		@empty_preset_text := "<Choose Preset...>"
+		
+		declare $safe_flag_1 := 1
+		declare $safe_flag_2 := 1
+		declare $safe_flag_3 := 1
+
+		declare !category_names[$NUM_CATEGORIES]
+				!category_names[0] := "SMOOTH                "
+				!category_names[1] := "TIGHT"
+				!category_names[2] := "FAT"
+				!category_names[3] := "DIRTY"
+				!category_names[4] := "SPECIAL"
+				!category_names[5] := "RAW"
+				!category_names[6] := "USER"
+
+		declare ui_menu  $category_mnu
+		declare ui_label $bank_name_lbl(1,1)
+
+		declare %category_controls_id[02]
+		%category_controls_id[00] := get_ui_id($category_mnu)
+		%category_controls_id[01] := get_ui_id($bank_name_lbl)
+
+		set_control_par_str(%category_controls_id[00],$CONTROL_PAR_PICTURE,"header-presetbank-btn")
+			set_control_par(%category_controls_id[00],$CONTROL_PAR_TEXTPOS_Y,25)
+			set_control_par(%category_controls_id[00],$CONTROL_PAR_FONT_TYPE,$FONT_ID)
+			set_control_par(%category_controls_id[00],$CONTROL_PAR_WIDTH,20)
+			set_control_par(%category_controls_id[00],$CONTROL_PAR_HEIGHT,28)
+			move_control_px($category_mnu, 13, 12)
+
+		set_control_par_str(%category_controls_id[01],$CONTROL_PAR_PICTURE,"header-presetbank-label"){header-presetbank-label}
+		set_control_par_str(%category_controls_id[01],$CONTROL_PAR_TEXT,"")
+			set_control_par(%category_controls_id[01],$CONTROL_PAR_POS_X,16)
+			set_control_par(%category_controls_id[01],$CONTROL_PAR_POS_Y,14)
+			set_control_par(%category_controls_id[01],$CONTROL_PAR_WIDTH,167)
+			set_control_par(%category_controls_id[01],$CONTROL_PAR_HEIGHT,24)	
+
+		$arr_count_1 := 0
+		while($arr_count_1 < $NUM_CATEGORIES)
+			add_menu_item($category_mnu,!category_names[$arr_count_1],$arr_count_1)
+			inc($arr_count_1)
+		end while
+
+	{SOUND PRESET MENU}
+		declare const $NUM_SOUND_CATEGORIES	:= 7 	{1-6 = FACTORY, 7 = USER}
+		declare const $FACTORY_PRESET_CAT_1	:= 0
+		declare const $FACTORY_PRESET_CAT_2	:= 1
+		declare const $FACTORY_PRESET_CAT_3	:= 2
+		declare const $FACTORY_PRESET_CAT_4	:= 3
+		declare const $FACTORY_PRESET_CAT_5	:= 4
+		declare const $FACTORY_PRESET_CAT_6	:= 5
+		declare const $USER_PRESET_CAT		:= 6
+
+		declare @user_sound_preset_name
+
+		declare $Preset_Category
+		make_persistent($Preset_Category)
+		read_persistent_var($Preset_Category)
+
+		declare $fact_menu_1_index
+		declare $fact_menu_2_index
+		declare $fact_menu_3_index
+		declare $fact_menu_4_index
+		declare $fact_menu_5_index
+		declare $fact_menu_6_index
+		declare $user_menu_index
+
+		declare $sound_preset_load_id_1
+		declare $sound_preset_load_id_2
+		declare $sound_preset_load_id_3
+		declare $sound_preset_load_id_4
+
+		declare ui_menu   $user_sound_preset_menu_NEW
+		declare $user_dummy_menu_id
+		declare ui_menu   $fact_sound_preset_menu_1
+		declare ui_menu   $fact_sound_preset_menu_2
+		declare ui_menu   $fact_sound_preset_menu_3
+		declare ui_menu   $fact_sound_preset_menu_4
+		declare ui_menu   $fact_sound_preset_menu_5
+		declare ui_menu   $fact_sound_preset_menu_6
+		declare ui_menu   $user_sound_preset_menu
+		declare ui_button $sound_preset_prev
+		declare ui_button $sound_preset_next
+		declare ui_button $sound_preset_save
+		declare ui_button $sound_preset_delete
+		
+		declare %sound_preset_controls[$NUM_PRESET_CONTROLS]
+		%sound_preset_controls[00] := get_ui_id($fact_sound_preset_menu_1)
+		%sound_preset_controls[01] := get_ui_id($fact_sound_preset_menu_2)
+		%sound_preset_controls[02] := get_ui_id($fact_sound_preset_menu_3)
+		%sound_preset_controls[03] := get_ui_id($fact_sound_preset_menu_4)
+		%sound_preset_controls[04] := get_ui_id($fact_sound_preset_menu_5)
+		%sound_preset_controls[05] := get_ui_id($fact_sound_preset_menu_6)
+		%sound_preset_controls[06] := get_ui_id($user_sound_preset_menu)
+		%sound_preset_controls[07] := get_ui_id($sound_preset_prev)
+		%sound_preset_controls[08] := get_ui_id($sound_preset_next)
+		%sound_preset_controls[09] := get_ui_id($sound_preset_save)
+		%sound_preset_controls[10] := get_ui_id($sound_preset_delete)
+		$user_dummy_menu_id := get_ui_id($user_sound_preset_menu_NEW)
+		
+		$a := 0
+		while ($a < 7)
+			set_control_par_str(%sound_preset_controls[$a],$CONTROL_PAR_PICTURE,"header-preset-btn")
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_POS_X,13)
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_POS_Y,41)
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_TEXTPOS_Y,5)
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_FONT_TYPE,$FONT_ID)
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_WIDTH,91)
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_HEIGHT,24)
+			inc($a)
+		end while
+
+		{dummy menu used for switching when no User Presets are present}
+		set_control_par_str($user_dummy_menu_id,$CONTROL_PAR_PICTURE,"header-preset-btn-NO_PRESETS")
+			set_control_par($user_dummy_menu_id,$CONTROL_PAR_POS_X,13)
+			set_control_par($user_dummy_menu_id,$CONTROL_PAR_POS_Y,41)
+			set_control_par($user_dummy_menu_id,$CONTROL_PAR_TEXTPOS_Y,5)
+			set_control_par($user_dummy_menu_id,$CONTROL_PAR_FONT_TYPE,$FONT_ID)
+			set_control_par($user_dummy_menu_id,$CONTROL_PAR_WIDTH,91)
+			set_control_par($user_dummy_menu_id,$CONTROL_PAR_HEIGHT,24)
+			set_control_par($user_dummy_menu_id,$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+
+		$a := 7
+		while ($a < 9)
+			set_control_par_str(%sound_preset_controls[$a],$CONTROL_PAR_TEXT,"")
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_POS_Y,41)
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_WIDTH,18)
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_HEIGHT,24)
+			inc($a)
+		end while
+		set_control_par_str(%sound_preset_controls[07],$CONTROL_PAR_PICTURE,"header-preset-left-btn")
+			set_control_par(%sound_preset_controls[07],$CONTROL_PAR_POS_X,128)
+		set_control_par_str(%sound_preset_controls[08],$CONTROL_PAR_PICTURE,"header-preset-right-btn")
+			set_control_par(%sound_preset_controls[08],$CONTROL_PAR_POS_X,144)
+		
+		$a := 9
+		while ($a < 11)
+			set_control_par_str(%sound_preset_controls[$a],$CONTROL_PAR_TEXT,"")
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_POS_Y,41)
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_WIDTH,21)
+				set_control_par(%sound_preset_controls[$a],$CONTROL_PAR_HEIGHT,24)
+			inc($a)
+		end while
+		set_control_par_str(%sound_preset_controls[09],$CONTROL_PAR_PICTURE,"header-preset-save-btn-disabled")
+			set_control_par(%sound_preset_controls[09],$CONTROL_PAR_POS_X,182)
+		set_control_par_str(%sound_preset_controls[10],$CONTROL_PAR_PICTURE,"header-preset-delete-btn-disabled"){NID_header_btn_delete}
+			set_control_par(%sound_preset_controls[10],$CONTROL_PAR_POS_X,161)
+		
+		set_control_help($fact_sound_preset_menu_1,"Sound Preset Menu: Selects and loads settings for the whole instrument.")
+		set_control_help($fact_sound_preset_menu_2,"Sound Preset Menu: Selects and loads settings for the whole instrument.")
+		set_control_help($fact_sound_preset_menu_3,"Sound Preset Menu: Selects and loads settings for the whole instrument.")
+		set_control_help($fact_sound_preset_menu_4,"Sound Preset Menu: Selects and loads settings for the whole instrument.")
+		set_control_help($fact_sound_preset_menu_5,"Sound Preset Menu: Selects and loads settings for the whole instrument.")
+		set_control_help($fact_sound_preset_menu_6,"Sound Preset Menu: Selects and loads settings for the whole instrument.")
+		set_control_help($user_sound_preset_menu,"Sound Preset Menu: Selects and loads settings for the whole instrument.")
+		set_control_help($user_sound_preset_menu_NEW,"Sound Preset Menu: Selects and loads settings for the whole instrument.")
+		set_control_help($sound_preset_prev,"Previous Pattern Preset: Selects and loads settings for the whole array from the preset that is located before this one in the array preset menu.")
+		set_control_help($sound_preset_next,"Next Pattern Preset: Selects and loads settings for the whole array from the preset that is located after this one in the array preset menu.")
+		set_control_help($sound_preset_save,"Save Pattern Preset: Factory presets cannot be overwritten. If you save a factory preset it will be under the USER menu.")
+		set_control_help($sound_preset_delete,"Delete Pattern Preset: Deletes the currently selected array preset. You cannot delete factory presets.")
+		
+		{xxx Factory Presets, xxx User Presets}
+		declare const $TEMP_NUM_FACT_SOUND_PRESETS := 60
+		declare const $NUM_PRESETS_PER_CAT		:= 10
+		declare const $MAX_SOUND_FACT_PRESETS	:= 6 * $NUM_PRESETS_PER_CAT
+		declare const $NUM_FACT_SOUND_PRESETS_1	:= $MAX_SOUND_FACT_PRESETS / 6
+		declare const $NUM_FACT_SOUND_PRESETS_2	:= $MAX_SOUND_FACT_PRESETS / 6
+		declare const $NUM_FACT_SOUND_PRESETS_3	:= $MAX_SOUND_FACT_PRESETS / 6
+		declare const $NUM_FACT_SOUND_PRESETS_4	:= $MAX_SOUND_FACT_PRESETS / 6
+		declare const $NUM_FACT_SOUND_PRESETS_5	:= $MAX_SOUND_FACT_PRESETS / 6
+		declare const $NUM_FACT_SOUND_PRESETS_6	:= $MAX_SOUND_FACT_PRESETS / 6
+		declare const $NUM_USER_SOUND_PRESETS	:= 70
+		
+		declare !fact_sound_preset_1_names[10]
+		!fact_sound_preset_1_names[0] := "Smack That"
+		!fact_sound_preset_1_names[1] := "Round and Tight"
+		!fact_sound_preset_1_names[2] := "Huge Metallic"
+		!fact_sound_preset_1_names[3] := "Dark Dry Room"
+		!fact_sound_preset_1_names[4] := "RnB Ballad"
+		!fact_sound_preset_1_names[5] := "Trap"
+		!fact_sound_preset_1_names[6] := "Squish"
+		!fact_sound_preset_1_names[7] := "Clean Power"
+		!fact_sound_preset_1_names[8] := "Stereo Beauty"
+		!fact_sound_preset_1_names[9] := "INIT"
+
+		declare !fact_sound_preset_2_names[10]
+		!fact_sound_preset_2_names[0] := "Dry Snap"
+		!fact_sound_preset_2_names[1] := "Wood Chamber"
+		!fact_sound_preset_2_names[2] := "Vintage Tape"
+		!fact_sound_preset_2_names[3] := "SubClap"
+		!fact_sound_preset_2_names[4] := "Power Ribbon"
+		!fact_sound_preset_2_names[5] := "Diamond"
+		!fact_sound_preset_2_names[6] := "Scud"
+		!fact_sound_preset_2_names[7] := "Peppers"
+		!fact_sound_preset_2_names[8] := "MD"
+		!fact_sound_preset_2_names[9] := "Classic Break"
+
+		declare !fact_sound_preset_3_names[10]
+		!fact_sound_preset_3_names[0] := "Big Bright Room"
+		!fact_sound_preset_3_names[1] := "Short Funk"
+		!fact_sound_preset_3_names[2] := "Wet Dirty Pop"
+		!fact_sound_preset_3_names[3] := "Salsa"
+		!fact_sound_preset_3_names[4] := "Praise"
+		!fact_sound_preset_3_names[5] := "Natural"
+		!fact_sound_preset_3_names[6] := "Red Tape"
+		!fact_sound_preset_3_names[7] := "Cleyed"
+		!fact_sound_preset_3_names[8] := "Filthy"
+		!fact_sound_preset_3_names[9] := "Mara"
+
+		declare !fact_sound_preset_4_names[10]
+		!fact_sound_preset_4_names[0] := "Hybrid"
+		!fact_sound_preset_4_names[1] := "Shed"
+		!fact_sound_preset_4_names[2] := "Rough"
+		!fact_sound_preset_4_names[3] := "Rude Comp"
+		!fact_sound_preset_4_names[4] := "Nasty"
+		!fact_sound_preset_4_names[5] := "Char"
+		!fact_sound_preset_4_names[6] := "Dusty"
+		!fact_sound_preset_4_names[7] := "Blapp"
+		!fact_sound_preset_4_names[8] := "Droyd"
+		!fact_sound_preset_4_names[9] := "53rd Ave"
+
+		declare !fact_sound_preset_5_names[10]
+		!fact_sound_preset_5_names[0] := "Tape Drive"
+		!fact_sound_preset_5_names[1] := "Early Days"
+		!fact_sound_preset_5_names[2] := "Krack"
+		!fact_sound_preset_5_names[3] := "Electro"
+		!fact_sound_preset_5_names[4] := "SP"
+		!fact_sound_preset_5_names[5] := "Vinyl"
+		!fact_sound_preset_5_names[6] := "Robotic Break"
+		!fact_sound_preset_5_names[7] := "Reduction"
+		!fact_sound_preset_5_names[8] := "Tribal"
+		!fact_sound_preset_5_names[9] := "Destroyer"
+
+		declare !fact_sound_preset_6_names[10]
+		!fact_sound_preset_6_names[0] := "Agressive Break"
+		!fact_sound_preset_6_names[1] := "Electro Boom"
+		!fact_sound_preset_6_names[2] := "Dead Dry"
+		!fact_sound_preset_6_names[3] := "Plate Flex"
+		!fact_sound_preset_6_names[4] := "So Far"
+		!fact_sound_preset_6_names[5] := "Shadow"
+		!fact_sound_preset_6_names[6] := "Room Sat"
+		!fact_sound_preset_6_names[7] := "Trash Gate"
+		!fact_sound_preset_6_names[8] := "Hiss"
+		!fact_sound_preset_6_names[9] := "Brighter"
+
+		declare %user_num_snd_Presets[1]
+		declare %user_snd_preset_Ac_Group_PURGE [$NUM_USER_SOUND_PRESETS * $AC_NUM_GROUPS]
+		declare %user_snd_preset_El_Group_PURGE [$NUM_USER_SOUND_PRESETS * $EL_NUM_GROUPS]
+		declare !user_sound_preset_names[$NUM_USER_SOUND_PRESETS]
+		
+		read_persistent_var(%user_num_snd_Presets)
+		read_persistent_var(%user_snd_preset_Ac_Group_PURGE)
+		read_persistent_var(%user_snd_preset_El_Group_PURGE)
+		
+		%load_check_id[00] := load_array(%user_num_snd_Presets, 1)
+		%load_check_id[01] := load_array(%user_snd_preset_Ac_Group_PURGE, 1)
+		%load_check_id[02] := load_array(%user_snd_preset_El_Group_PURGE, 1)
+		%load_check_id[03] := load_array(!user_sound_preset_names,1)
+
+		
+		declare $sound_preset_flag := 0
+		make_persistent($sound_preset_flag)
+		read_persistent_var($sound_preset_flag)
+		
+		make_persistent($category_mnu)
+		read_persistent_var($category_mnu)
+		set_control_par(%category_controls_id[01],$CONTROL_PAR_PICTURE_STATE,$category_mnu)
+		make_persistent($fact_sound_preset_menu_1)
+		read_persistent_var($fact_sound_preset_menu_1)
+		make_persistent($fact_sound_preset_menu_2)
+		read_persistent_var($fact_sound_preset_menu_2)
+		make_persistent($fact_sound_preset_menu_3)
+		read_persistent_var($fact_sound_preset_menu_3)
+		make_persistent($fact_sound_preset_menu_4)
+		read_persistent_var($fact_sound_preset_menu_4)
+		make_persistent($fact_sound_preset_menu_5)
+		read_persistent_var($fact_sound_preset_menu_5)
+		make_persistent($fact_sound_preset_menu_6)
+		read_persistent_var($fact_sound_preset_menu_6)
+		make_persistent($user_sound_preset_menu)
+		read_persistent_var($user_sound_preset_menu)
+		make_persistent($user_sound_preset_menu_NEW)
+		read_persistent_var($user_sound_preset_menu_NEW)
+
+		{populate menu}
+		$arr_count_1 := 0
+		while($arr_count_1 < $NUM_FACT_SOUND_PRESETS_1)
+			add_menu_item($fact_sound_preset_menu_1,!fact_sound_preset_1_names[$arr_count_1],$arr_count_1)
+			inc($arr_count_1)
+		end while
+		while($arr_count_1 < $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_1)
+			add_menu_item($fact_sound_preset_menu_2,!fact_sound_preset_2_names[$arr_count_1 - $NUM_FACT_SOUND_PRESETS_1],$arr_count_1)
+			inc($arr_count_1)
+		end while
+		while($arr_count_1 < $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_1)
+			add_menu_item($fact_sound_preset_menu_3,!fact_sound_preset_3_names[$arr_count_1 - $NUM_FACT_SOUND_PRESETS_2 - $NUM_FACT_SOUND_PRESETS_1],$arr_count_1)
+			inc($arr_count_1)
+		end while
+		while($arr_count_1 < $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_1)
+			add_menu_item($fact_sound_preset_menu_4,!fact_sound_preset_4_names[$arr_count_1 - $NUM_FACT_SOUND_PRESETS_3 - $NUM_FACT_SOUND_PRESETS_2 - $NUM_FACT_SOUND_PRESETS_1],$arr_count_1)
+			inc($arr_count_1)
+		end while
+		while($arr_count_1 < $NUM_FACT_SOUND_PRESETS_5 + $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_1)
+			add_menu_item($fact_sound_preset_menu_5,!fact_sound_preset_5_names[$arr_count_1 - $NUM_FACT_SOUND_PRESETS_4 - $NUM_FACT_SOUND_PRESETS_3 - $NUM_FACT_SOUND_PRESETS_2 - $NUM_FACT_SOUND_PRESETS_1],$arr_count_1)
+			inc($arr_count_1)
+		end while
+		while($arr_count_1 < $NUM_FACT_SOUND_PRESETS_6 + $NUM_FACT_SOUND_PRESETS_5 + $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_1)
+			add_menu_item($fact_sound_preset_menu_6,!fact_sound_preset_6_names[$arr_count_1 - $NUM_FACT_SOUND_PRESETS_5 - $NUM_FACT_SOUND_PRESETS_4 - $NUM_FACT_SOUND_PRESETS_3 - $NUM_FACT_SOUND_PRESETS_2 - $NUM_FACT_SOUND_PRESETS_1],$arr_count_1)
+			inc($arr_count_1)
+		end while
+		
+		$arr_count_1 := $MAX_SOUND_FACT_PRESETS
+		while($arr_count_1 < $MAX_SOUND_FACT_PRESETS + $NUM_USER_SOUND_PRESETS)
+			add_menu_item($user_sound_preset_menu,!user_sound_preset_names[$arr_count_1 - $MAX_SOUND_FACT_PRESETS],$arr_count_1)
+			add_menu_item($user_sound_preset_menu_NEW,!user_sound_preset_names[$arr_count_1 - $MAX_SOUND_FACT_PRESETS],$arr_count_1)
+			inc($arr_count_1)
+		end while
+
+		$arr_count_2 := 0
+		while($arr_count_2 < $NUM_USER_SOUND_PRESETS)
+			if ($arr_count_2 < %user_num_snd_Presets[0])
+				set_menu_item_visibility(%sound_preset_controls[06], $arr_count_2, 1)
+				set_menu_item_visibility($user_dummy_menu_id, $arr_count_2, 1)
+			else
+				set_menu_item_visibility(%sound_preset_controls[06], $arr_count_2, 0)
+				set_menu_item_visibility($user_dummy_menu_id, $arr_count_2, 0)
+			end if
+			inc($arr_count_2)
+		end while
+
+		if (%user_num_snd_Presets[0] = 0)
+			set_control_par(%sound_preset_controls[06],$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+			set_control_par($user_dummy_menu_id,$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+		else
+			set_control_par(%sound_preset_controls[06],$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+			set_control_par($user_dummy_menu_id,$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+		end if
+		
+		declare $last_sound_preset
+		make_persistent($last_sound_preset)
+		read_persistent_var($last_sound_preset)
+
+		declare $last_bank_1
+		declare $last_bank_2
+		declare $last_bank_3
+		declare $last_bank_4
+		declare $last_bank_5
+		declare $last_bank_6
+		declare $last_user_bank
+
+		make_persistent($last_bank_1)
+		make_persistent($last_bank_2)
+		make_persistent($last_bank_3)
+		make_persistent($last_bank_4)
+		make_persistent($last_bank_5)
+		make_persistent($last_bank_6)
+		make_persistent($last_user_bank)
+
+		declare $active_preset
+		make_persistent($active_preset)
+		read_persistent_var($active_preset)
+		declare $preset_change_flag
+
+	{HARDCODED SOUND PRESETS}
+		declare %fact_snd_preset_Ac_Group_PURGE[$TEMP_NUM_FACT_SOUND_PRESETS * $AC_NUM_GROUPS] := (...
+				{01 Smooth}...
+				{PRESET 1}...
+				0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,1,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,1,1,1,1,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,1,1,1,1,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,1,1,1,1,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,...
+				{PRESET 2}...
+				0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,0,1,1,0,1,1,1,1,1,1,1,0,0,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,0,1,1,0,1,1,1,1,1,1,1,0,0,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,0,1,1,0,1,1,1,1,1,1,1,0,0,0,0,0,1,0,0,0,0,1,1,0,0,0,...
+				{PRESET 3}...
+				0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,1,...
+				{PRESET 4}...
+				0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,1,0,0,1,0,...
+				{PRESET 5}...
+				0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,1,0,1,1,1,1,1,1,0,1,0,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,1,0,1,1,1,1,1,1,0,1,0,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,1,0,1,1,1,1,1,1,0,1,0,0,0,1,0,0,0,0,0,1,0,0,1,0,...
+				{PRESET 6}...
+				0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,...
+				{PRESET 7}...
+				0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,...
+				{PRESET 8}...
+				0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1,0,0,...
+				{PRESET 9}...
+				0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,...
+				{PRESET 10}...
+				0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,...
+				{02 Tight}...
+				{PRESET 1}...
+				0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,...
+				{PRESET 2}...
+				0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,1,0,0,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,1,0,0,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,1,0,0,0,0,0,1,0,0,0,0,1,1,0,0,0,...
+				{PRESET 3}...
+				0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,...
+				{PRESET 4}...
+				0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,...
+				{PRESET 5}...
+				0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,...
+				{PRESET 6}...
+				0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,1,0,0,0,...
+				{PRESET 7}...
+				0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,0,0,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,0,0,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,0,0,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,...
+				{PRESET 8}...
+				0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,0,...
+				{PRESET 9}...
+				0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,...
+				{PRESET 10}...
+				0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,...
+				{03 Fat}...
+				{PRESET 1}...
+				1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,1,0,0,0,...
+				{PRESET 2}...
+				0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,...
+				{PRESET 3}...
+				0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,...
+				{PRESET 4}...
+				0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,1,0,1,0,0,0,0,0,0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,1,0,1,0,0,0,0,0,0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,1,0,1,0,0,0,0,0,0,1,1,0,0,0,0,1,0,0,0,1,0,0,...
+				{PRESET 5}...
+				0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,1,...
+				{PRESET 6}...
+				0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,1,0,1,0,0,1,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,1,0,1,0,0,1,1,0,1,0,0,0,1,0,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,1,0,1,0,0,1,1,0,1,0,0,0,1,0,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,1,0,1,0,0,1,1,0,1,0,0,0,1,0,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,...
+				{PRESET 7}...
+				0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,1,0,...
+				{PRESET 8}...
+				0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,...
+				{PRESET 9}...
+				0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,...
+				{PRESET 10}...
+				0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,...
+				{04 Dirty}...
+				{PRESET 1}...
+				0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,0,0,0,1,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,0,0,0,1,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,0,1,0,0,0,0,1,0,1,0,0,1,0,0,0,0,1,0,0,...
+				{PRESET 2}...
+				0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,1,0,1,0,0,1,0,0,1,0,1,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,1,0,1,0,0,1,0,0,1,0,1,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,1,0,1,0,0,1,0,0,1,0,1,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,...
+				{PRESET 3}...
+				0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,...
+				{PRESET 4}...
+				0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,...
+				{PRESET 5}...
+				0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,...
+				{PRESET 6}...
+				0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,0,1,1,1,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,0,1,1,1,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,0,1,0,1,1,1,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,...
+				{PRESET 7}...
+				0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,1,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,1,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,1,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,...
+				{PRESET 8}...
+				0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,...
+				{PRESET 9}...
+				0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,...
+				{PRESET 10}...
+				0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,...
+				{05 Special}...
+				{PRESET 1}...
+				0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,0,1,0,0,0,...
+				{PRESET 2}...
+				0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,1,1,0,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,...
+				{PRESET 3}...
+				0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,1,0,1,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,1,0,1,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,1,0,1,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,...
+				{PRESET 4}...
+				0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,...
+				{PRESET 5}...
+				0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,...
+				{PRESET 6}...
+				0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,...
+				{PRESET 7}...
+				0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,1,0,1,0,0,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,...
+				{PRESET 8}...
+				0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,1,0,...
+				{PRESET 9}...
+				0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,...
+				{PRESET 10}...
+				0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,...
+				{06 Raw}...
+				{PRESET 1}...
+				0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,0,1,0,0,0,0,0,1,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,0,1,0,0,0,0,0,1,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,0,1,0,0,0,0,0,1,0,0,1,0,0,1,0,0,0,...
+				{PRESET 2}...
+				0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,0,0,1,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,0,0,1,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,0,0,1,0,0,1,0,0,1,0,0,0,...
+				{PRESET 3}...
+				0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,1,1,0,0,0,...
+				{PRESET 4}...
+				0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,...
+				{PRESET 5}...
+				0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,...
+				{PRESET 6}...
+				0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,1,0,1,0,0,0,0,0,0,1,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,1,0,1,0,0,0,0,0,0,1,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,1,0,1,1,0,0,0,1,0,1,0,0,0,0,0,0,1,0,1,0,0,1,0,0,0,...
+				{PRESET 7}...
+				0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0,...
+				{PRESET 8}...
+				0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,...
+				{PRESET 9}...
+				1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,...
+				{PRESET 10}...
+				0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0)
+
+		declare %fact_snd_preset_El_Group_PURGE[$TEMP_NUM_FACT_SOUND_PRESETS * $EL_NUM_GROUPS] := (...
+				{01 Smooth}...
+				{PRESET 1}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 2}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 3}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 4}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 5}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 6}...
+				0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 7}...
+				0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,...
+				{PRESET 8}...
+				0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 9}...
+				0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,...
+				{PRESET 10}...
+				0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{02 Tight}...
+				{PRESET 1}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 2}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 3}...
+				0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 4}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 5}...
+				0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 6}...
+				0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 7}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,...
+				{PRESET 8}...
+				0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,...
+				{PRESET 9}...
+				0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,...
+				{PRESET 10}...
+				0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{03 Fat}...
+				{PRESET 1}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 2}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,...
+				{PRESET 3}...
+				0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,...
+				{PRESET 4}...
+				1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,...
+				{PRESET 5}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,...
+				{PRESET 6}...
+				0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,...
+				{PRESET 7}...
+				0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 8}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{PRESET 9}...
+				0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 10}...
+				0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,...
+				{04 Dirty}...
+				{PRESET 1}...
+				1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,...
+				{PRESET 2}...
+				0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,...
+				{PRESET 3}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 4}...
+				0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{PRESET 5}...
+				0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{PRESET 6}...
+				0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{PRESET 7}...
+				0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{PRESET 8}...
+				0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{PRESET 9}...
+				0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{PRESET 10}...
+				0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{05 Special}...
+				{PRESET 1}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 2}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,...
+				{PRESET 3}...
+				0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,...
+				{PRESET 4}...
+				0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,...
+				{PRESET 5}...
+				0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{PRESET 6}...
+				0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{PRESET 7}...
+				0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{PRESET 8}...
+				1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 9}...
+				0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,...
+				{PRESET 10}...
+				0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,...
+				{06 Raw}...
+				{PRESET 1}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 2}...
+				1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,...
+				{PRESET 3}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,...
+				{PRESET 4}...
+				0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 5}...
+				0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 6}...
+				1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,...
+				{PRESET 7}...
+				0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 8}...
+				0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 9}...
+				0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,...
+				{PRESET 10}...
+				0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0)
+
+{MIDI FILE LOAD PERSISTENCY}
+	$count_1 := 0
+	while ($count_1 < $MAX_NUM_PATTERNS)
+		if (%key_has_pattern[$count_1] = $YES)
+			$pattern_edit_flag := 1
+			pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(LOADED_MIDI, $count_1, 1)
+		else
+			$pattern_edit_flag := 0
+			pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(LOADED_MIDI, $count_1, 0)
+		end if
+		inc($count_1)
+	end while
+	pgs_set_key_val(COMMAND, 0, 2)
+
+	$load_mf_id := mf_insert_file(@file_path, 0, 0, $REPLACE_ALL)
+	mf_set_export_area(@file_name, -1, -1, 0, 0)
+	
+	pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(GROOVE_ACTION, 1, 0)
+		pgs_set_key_val(GROOVE_ACTION, 2, 0)
+		pgs_set_key_val(GROOVE_ACTION, 3, 1)
+		pgs_set_str_key_val(GROOVE_TITLE, @file_name)
+		@file_name := pgs_get_str_key_val(GROOVE_TITLE)
+		set_text($groove_display_lbl, @file_name)
+	pgs_set_key_val(COMMAND, 0, 2)
+$init_flag  := 0
+$midi_init	:= 1
+end on
+
+function suspend_playback
+	{interrupt playback while processing the MIDI-object}
+	$old_play := $play_btn
+	
+	$play_btn := 0
+	$processing_flag := 1
+	note_off($ALL_EVENTS)
+	
+	while ($play_flag = 1)
+		wait(1000)
+	end while
+end function
+
+function restore_playback
+	{re-initiate playback if playback was on when the function was invoked}
+	$play_btn := $old_play
+	$processing_flag := 0
+end function
+
+function quantize
+	{variables passed:		$quant_resol  (ticks)
+							$quant_amount (percent)
+							
+	variables used:			$count_1
+							$old_pos
+							$pos_offset}
+	
+	if ($quant_amount < 0 and $grid_sld < 2)
+		$temp_quant_resol := 240
+	else
+		$temp_quant_resol := $quant_resol
+	end if
+	
+	$count_1 := 1
+	while ($count_1 > 0)
+		mf_get_first($TRACK_IDX)
+		$count_1 := 0
+		while (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_MIDI_COMMAND) # 0)
+			if (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_0) # $processed_flag_value)
+				
+				$old_pos := mf_get_pos()
+
+				if ($old_pos mod $temp_quant_resol <= $temp_quant_resol / 2)
+					$pos_offset := ($old_pos / $temp_quant_resol * $temp_quant_resol - $old_pos) * 1000 * $quant_amount / 100000
+				else
+					$pos_offset := ($old_pos / $temp_quant_resol * $temp_quant_resol + $temp_quant_resol - $old_pos) * 1000 * $quant_amount / 100000
+				end if
+				
+				if ($quant_amount < 0)
+					if ($grid_sld = 0)
+						$grid_value := 1
+					else
+						$grid_value := $grid_sld
+					end if
+					$pos_offset := $pos_offset + random($quant_amount / $grid_value, -$quant_amount / $grid_value)
+				end if
+
+				{if ($old_pos + $pos_offset > $mf_tmp_length) MF_LENGTH}
+				if ($old_pos + $pos_offset > $MF_LENGTH) 
+					$pos_offset := $mf_tmp_length - $old_pos
+				else
+					if ($old_pos + $pos_offset < 0)
+						$pos_offset := $old_pos
+					end if
+				end if
+
+				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_POS, $old_pos + $pos_offset)
+				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_0, $processed_flag_value)
+				
+				inc($count_1)
+			end if
+			
+			mf_get_next($TRACK_IDX)
+			wait(1)
+		end while
+	end while
+
+	inc($processed_flag_value)
+end function
+
+function swing
+	{variables passed:		$swing_cycle_transform  (ticks)
+							$swing_amount (percent)
+							
+	variables used:			$count_1
+							$old_pos
+							$pos_offset}
+	$count_1 := 1
+	while ($count_1 > 0)
+		mf_get_first($TRACK_IDX)
+		$count_1 := 0
+		while (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_MIDI_COMMAND) # 0)
+			if (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_0) # $processed_flag_value)
+				$old_pos := mf_get_pos()
+				if ($old_pos mod $swing_cycle <= $swing_cycle / 2)
+					$pos_offset := ($old_pos mod $swing_cycle) * ($swing_cycle / 2 + $swing_cycle * $swing_amount / 200) / ($swing_cycle / 2) - ($old_pos mod $swing_cycle)
+				else
+					$pos_offset := ((($old_pos mod $swing_cycle) - $swing_cycle / 2) * $swing_cycle + ($swing_cycle - $old_pos mod $swing_cycle) * ($swing_cycle / 2 + $swing_cycle * $swing_amount / 200)) / ($swing_cycle / 2) - ($old_pos mod $swing_cycle)
+				end if
+				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_POS, $old_pos + $pos_offset)
+				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_0, $processed_flag_value)
+				inc($count_1)
+			end if
+			mf_get_next($TRACK_IDX)
+			wait(1)
+		end while
+	end while
+
+	inc($processed_flag_value)
+end function
+
+function change_length
+	{variables passed:		$stretch_amt	(1 for x2, 4 for 1/2)
+							
+	variables used:			$count_1
+							$mf_tmp_length}
+	$count_1 := 1
+	while ($count_1 > 0)
+		mf_get_first($TRACK_IDX)
+		$count_1 := 0
+		while (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_MIDI_COMMAND) # 0)
+			if (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_0) # $processed_flag_value)
+				$old_pos := mf_get_pos()
+
+				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_POS, $old_pos * $stretch_amt / 2)
+
+				if (mf_get_command() = $MIDI_COMMAND_NOTE_ON)
+					mf_set_note_length(mf_get_note_length() * $stretch_amt / 2)
+				end if
+				
+				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_0, $processed_flag_value)
+				
+				inc($count_1)
+			end if
+			mf_get_next($TRACK_IDX)
+			wait(1)
+		end while
+	end while
+
+	inc($processed_flag_value)
+	
+	$mf_tmp_length := $MF_LENGTH * $stretch_amt / 2
+end function
+
+function velocity
+	{variables passed:		$higher, $lower
+							
+	variables used:			$count_1
+							$mf_tmp_length
+							%event_array_2[5 * 6500]}
+
+	mf_get_first($TRACK_IDX)
+	while (mf_get_command() # 0)
+		mf_set_byte_two(((mf_get_byte_two() - 1) * $higher + (127 - mf_get_byte_two()) * $lower) / 126)
+		wait(1)
+		mf_get_next($TRACK_IDX)
+	end while
+end function
+
+function visualize_MIDI
+	
+	{clear up display}
+	$a := 0
+    while ($a < num_elements(%midi_lbl_id) )
+            set_control_par(%midi_lbl_id[$a], $CONTROL_PAR_PICTURE_STATE,0)
+            set_control_par(%midi_lbl_id[$a], $CONTROL_PAR_WIDTH,  18)
+            set_control_par(%midi_lbl_id[$a], $CONTROL_PAR_POS_X,  25 + 18 * ($a mod 32)) 
+        inc($a) 
+    end while
+
+	$count_1 := 1
+	while ($count_1 > 0)
+		mf_get_first($TRACK_IDX)
+		$count_1 := 0
+		while (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_MIDI_COMMAND) # 0)
+			if (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_0) # $processed_flag_value)
+
+				$mf_event_position		 := mf_get_pos() / 240 
+				$mf_event_position_ticks := mf_get_pos() * 3 / 40
+				select ($stretch_amt)
+					case 4
+						$mf_event_position := $mf_event_position / $visual_stretch
+						$mf_event_position_ticks := $mf_event_position_ticks / $visual_stretch
+					case 2
+						$mf_event_position_ticks := $mf_event_position_ticks * $visual_stretch
+					case 1
+						$mf_event_position := $mf_event_position * $visual_stretch
+						$mf_event_position_ticks := $mf_event_position_ticks * $visual_stretch
+				end select
+
+
+				$mf_event_instrument	 := %visual_remap[%note_instruments[%default_mapping_data[mf_get_byte_one()]]]
+				
+				$mf_event_velocity		 := mf_get_byte_two()
+				
+				if ($mf_event_velocity > 126)
+					$mf_event_velocity := 126
+				else
+					if ($mf_event_velocity < 1)
+						$mf_event_velocity := 1
+					end if
+				end if
+
+				set_control_par(%midi_lbl_id[$mf_event_instrument * 32 + $mf_event_position], $CONTROL_PAR_POS_X, 25 + $mf_event_position_ticks)
+				set_control_par(%midi_lbl_id[$mf_event_instrument * 32 + $mf_event_position], $CONTROL_PAR_PICTURE_STATE,$mf_event_velocity)
+				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_0, $processed_flag_value)
+				message("")
+				inc($count_1)
+			end if
+			mf_get_next($TRACK_IDX)
+			wait(1)
+		end while
+	end while
+
+	$new_mf_flag := 0
+
+	inc($processed_flag_value)
+end function
+
+function process_midi_file
+	
+	call suspend_playback
+
+	$load_mf_id := mf_insert_file(@last_file_path, 0, 0, 0)
+	
+	while ($load_mf_id # -1)
+		wait(1000)
+	end while
+
+	$new_mf_flag := 1	
+	
+	if ($quant_amount # 0)
+		call quantize
+	end if
+	
+	if ($swing_amount # 0)
+		call swing
+	end if
+	
+	if ($normal_btn = 0)
+		call change_length
+	end if
+	
+	if ($velocity_sld # 0)
+		call velocity
+	end if
+
+	call restore_playback
+
+	call visualize_MIDI
+end function		
+
+function load_file
+	
+	call suspend_playback
+	
+	$load_mf_id := mf_insert_file(@file_path, 0, 0, $REPLACE_ALL)
+	
+	while ($load_mf_id # -1)
+		wait(1000)
+	end while
+
+	mf_get_first($TRACK_IDX)
+	while (mf_get_command() # 0)
+		if (mf_get_command() = $MIDI_COMMAND_NOTE_ON)
+			mf_set_byte_one(%default_mapping_data[mf_get_byte_one()])
+		end if
+		mf_get_next($TRACK_IDX)
+	end while
+
+	mf_set_export_area(@file_name, -1,-1,0,0)
+
+	call process_midi_file
+
+	call restore_playback
+	$play_btn := 1
+end function
+
+{PLAYBACK}
+	on ui_control ($play_btn)
+		$playing_flag := 0
+		$key_counter := $play_btn
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(GROOVE_ACTION, 0, $play_btn)
+		pgs_set_key_val(GROOVE_ACTION, 1, 0)
+		pgs_set_key_val(GROOVE_ACTION, 2, 0)
+		pgs_set_key_val(GROOVE_ACTION, 3, 0)
+		pgs_set_key_val(COMMAND, 0, 2)
+	end on
+
+	on ui_control ($prev_groove_btn)
+		if ($processing_flag # 1)
+			fs_navigate(%ui_id[0], 0)
+			$prev_groove_btn := 0
+		end if
+	end on
+
+	on ui_control ($next_groove_btn)
+		if ($processing_flag # 1)
+			fs_navigate(%ui_id[0], 1)
+			$next_groove_btn := 0
+		end if
+	end on
+
+{TEMPO / VELOCITY / SWING / TIGHTNESS / HALF / NORMAL / DOUBLE}
+	on ui_control ($quantize_sld)
+		$quant_amount := $quantize_sld
+		
+		$last_callback_id := $NI_CALLBACK_ID
+		wait($KNOB_ADJUSTMENT_TOLERANCE)
+		
+		if ($NI_CALLBACK_ID = $last_callback_id)
+			call process_midi_file
+		end if
+	end on
+
+	on ui_control ($swing_sld)
+		$swing_amount := $swing_sld
+
+		$last_callback_id := $NI_CALLBACK_ID
+		wait($KNOB_ADJUSTMENT_TOLERANCE)
+		
+		if ($NI_CALLBACK_ID = $last_callback_id)
+			call process_midi_file
+		end if
+	end on
+
+	on ui_control ($velocity_sld)
+		if ($velocity_sld < 0)
+			$lower := 1
+			$higher := 127 + $velocity_sld
+		else
+			$lower := $velocity_sld
+			$higher := 127
+		end if
+		
+		$last_callback_id := $NI_CALLBACK_ID
+		wait($KNOB_ADJUSTMENT_TOLERANCE)
+		
+		if ($NI_CALLBACK_ID = $last_callback_id)
+			call process_midi_file
+		end if
+	end on
+
+	on ui_control ($grid_sld)
+		$quant_resol := %quant_resol_transform[$grid_sld]
+		$swing_cycle := %swing_cycle_transform[$grid_sld]
+
+		$last_callback_id := $NI_CALLBACK_ID
+		wait($KNOB_ADJUSTMENT_TOLERANCE)
+		
+		if ($NI_CALLBACK_ID = $last_callback_id)
+			call process_midi_file
+		end if
+	end on
+
+	on ui_control ($grid_up_btn)
+		if ($grid_sld = 5)
+			$grid_sld := 0
+		else
+			inc($grid_sld)
+		end if
+
+		$quant_resol := %quant_resol_transform[$grid_sld]
+		$swing_cycle := %swing_cycle_transform[$grid_sld]
+		
+		call process_midi_file
+	end on
+
+	on ui_control ($grid_dn_btn)
+		if ($grid_sld = 0)
+			$grid_sld := 5
+		else
+			dec($grid_sld)
+		end if
+
+		$quant_resol := %quant_resol_transform[$grid_sld]
+		$swing_cycle := %swing_cycle_transform[$grid_sld]
+		
+		call process_midi_file
+	end on
+
+	on ui_control ($half_btn)
+		if ($half_btn = 1)
+			$stretch_amt := 4
+			$visual_stretch := 2
+			$normal_btn := 0
+			$double_btn := 0
+			
+			call process_midi_file
+		else
+			$half_btn := 1
+		end if
+	end on
+
+	on ui_control ($normal_btn)
+		if ($normal_btn = 1)
+			$stretch_amt := 2
+			$visual_stretch := 1
+			$half_btn := 0
+			$double_btn := 0
+			
+			call process_midi_file
+			$mf_tmp_length	 := $MF_LENGTH
+		else
+			$normal_btn := 1
+		end if
+	end on
+
+	on ui_control ($double_btn)
+		if ($double_btn = 1)
+			$stretch_amt := 1
+			$visual_stretch := 2
+			$half_btn := 0
+			$normal_btn := 0
+			
+			call process_midi_file
+		else
+			$double_btn := 1
+		end if
+	end on
+
+{SOUND PRESETS - CALLBACKS / FUNCTIONS}
+	function update_sound_preset_menu
+		{hide all}
+		$arr_count_1 := 0
+		while ($arr_count_1 < 7)
+			set_control_par(%sound_preset_controls[$arr_count_1], $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+			set_control_par($user_dummy_menu_id, $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+			inc($arr_count_1)
+		end while
+		{show selected}
+		if ($Preset_Category < 6)
+			set_control_par(%sound_preset_controls[$Preset_Category], $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)	
+			set_control_par($user_dummy_menu_id,$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+		else
+			if (%user_num_snd_Presets[0] = 0)
+				set_control_par(%sound_preset_controls[$Preset_Category],$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+				set_control_par($user_dummy_menu_id,$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+			else
+				set_control_par(%sound_preset_controls[$Preset_Category],$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+				set_control_par($user_dummy_menu_id,$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+			end if
+		end if
+	end function
+
+	{Sound Preset MENU Callback}
+		on ui_control ($fact_sound_preset_menu_1)
+			$last_sound_preset := $fact_sound_preset_menu_1
+			$last_bank_1 := $fact_sound_preset_menu_1
+
+			pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(PRESET_DATA, 0, 1)
+			pgs_set_key_val(PRESET_DATA, 1, 0)
+			pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_1)
+			pgs_set_key_val(PRESET_DATA, 4, 0)
+			pgs_set_key_val(COMMAND, 0, 1)
+
+			if (pgs_key_exists(PURGE_MODE))	
+				if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+	    			$group_count := 0
+	    		    while ($group_count < $AC_NUM_GROUPS)
+	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        inc($group_count)
+	    		    end while
+			    	$group_count := 0
+			        while ($group_count < $EL_NUM_GROUPS)
+			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            inc($group_count)
+			        end while
+	    		end if
+	    	end if
+		end on
+		on ui_control ($fact_sound_preset_menu_2)
+			$last_sound_preset := $fact_sound_preset_menu_2
+			$last_bank_2 := $fact_sound_preset_menu_2
+
+			pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(PRESET_DATA, 0, 1)
+			pgs_set_key_val(PRESET_DATA, 1, 0)
+			pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_2)
+			pgs_set_key_val(PRESET_DATA, 4, 0)
+			pgs_set_key_val(COMMAND, 0, 1)
+			
+			if (pgs_key_exists(PURGE_MODE))	
+				if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+	    			$group_count := 0
+	    		    while ($group_count < $AC_NUM_GROUPS)
+	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        inc($group_count)
+	    		    end while
+			    	$group_count := 0
+			        while ($group_count < $EL_NUM_GROUPS)
+			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            inc($group_count)
+			        end while
+	    		end if
+	    	end if
+		end on
+		on ui_control ($fact_sound_preset_menu_3)
+			$last_sound_preset := $fact_sound_preset_menu_3
+			$last_bank_3 := $fact_sound_preset_menu_3
+			pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(PRESET_DATA, 0, 1)
+			pgs_set_key_val(PRESET_DATA, 1, 0)
+			pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_3)
+			pgs_set_key_val(PRESET_DATA, 4, 0)
+			pgs_set_key_val(COMMAND, 0, 1)
+
+			if (pgs_key_exists(PURGE_MODE))	
+				if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+	    			$group_count := 0
+	    		    while ($group_count < $AC_NUM_GROUPS)
+	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        inc($group_count)
+	    		    end while
+			    	$group_count := 0
+			        while ($group_count < $EL_NUM_GROUPS)
+			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            inc($group_count)
+			        end while
+	    		end if
+	    	end if
+		end on
+		on ui_control ($fact_sound_preset_menu_4)
+			$last_sound_preset := $fact_sound_preset_menu_4
+			$last_bank_4 := $fact_sound_preset_menu_4
+			pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(PRESET_DATA, 0, 1)
+			pgs_set_key_val(PRESET_DATA, 1, 0)
+			pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_4)
+			pgs_set_key_val(PRESET_DATA, 4, 0)
+			pgs_set_key_val(COMMAND, 0, 1)
+
+			if (pgs_key_exists(PURGE_MODE))	
+				if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+	    			$group_count := 0
+	    		    while ($group_count < $AC_NUM_GROUPS)
+	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        inc($group_count)
+	    		    end while
+			    	$group_count := 0
+			        while ($group_count < $EL_NUM_GROUPS)
+			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            inc($group_count)
+			        end while
+	    		end if
+	    	end if
+		end on
+		on ui_control ($fact_sound_preset_menu_5)
+			$last_sound_preset := $fact_sound_preset_menu_5
+			$last_bank_5 := $fact_sound_preset_menu_5
+			pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(PRESET_DATA, 0, 1)
+			pgs_set_key_val(PRESET_DATA, 1, 0)
+			pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_5)
+			pgs_set_key_val(PRESET_DATA, 4, 0)
+			pgs_set_key_val(COMMAND, 0, 1)
+
+			if (pgs_key_exists(PURGE_MODE))	
+				if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+	    			$group_count := 0
+	    		    while ($group_count < $AC_NUM_GROUPS)
+	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        inc($group_count)
+	    		    end while
+			    	$group_count := 0
+			        while ($group_count < $EL_NUM_GROUPS)
+			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            inc($group_count)
+			        end while
+	    		end if
+	    	end if
+		end on
+		on ui_control ($fact_sound_preset_menu_6)
+			$last_sound_preset := $fact_sound_preset_menu_6
+			$last_bank_6 := $fact_sound_preset_menu_6
+			pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(PRESET_DATA, 0, 1)
+			pgs_set_key_val(PRESET_DATA, 1, 0)
+			pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_6)
+			pgs_set_key_val(PRESET_DATA, 4, 0)
+			pgs_set_key_val(COMMAND, 0, 1)
+
+			if (pgs_key_exists(PURGE_MODE))	
+				if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+	    			$group_count := 0
+	    		    while ($group_count < $AC_NUM_GROUPS)
+	    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+	    		        inc($group_count)
+	    		    end while
+			    	$group_count := 0
+			        while ($group_count < $EL_NUM_GROUPS)
+			            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+			            inc($group_count)
+			        end while
+	    		end if
+	    	end if
+		end on
+		on ui_control ($user_sound_preset_menu)
+			$last_sound_preset := $user_sound_preset_menu
+			$last_user_bank := $user_sound_preset_menu
+			$user_sound_preset_menu_NEW := $user_sound_preset_menu
+			pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(PRESET_DATA, 0, 1)
+			pgs_set_key_val(PRESET_DATA, 1, 0)
+			pgs_set_key_val(PRESET_DATA, 2, $user_sound_preset_menu)
+			pgs_set_key_val(PRESET_DATA, 4, 0)
+			pgs_set_key_val(COMMAND, 0, 1)
+
+			if (pgs_key_exists(PURGE_MODE))	
+				if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+	    			$group_count := 0
+	    		    while ($group_count < $AC_NUM_GROUPS)
+	    		        purge_group($group_count, %user_snd_preset_Ac_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $AC_NUM_GROUPS + $group_count])
+	    		        inc($group_count)
+	    		    end while
+			    	$group_count := 0
+			        while ($group_count < $EL_NUM_GROUPS)
+			            purge_group($group_count + $AC_NUM_GROUPS, %user_snd_preset_El_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $EL_NUM_GROUPS + $group_count])
+			            inc($group_count)
+			        end while
+	    		end if
+	    	end if
+		end on
+		on ui_control ($user_sound_preset_menu_NEW)
+			$last_sound_preset := $user_sound_preset_menu_NEW
+			$last_user_bank := $user_sound_preset_menu_NEW
+			$user_sound_preset_menu := $user_sound_preset_menu_NEW
+			pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(PRESET_DATA, 0, 1)
+			pgs_set_key_val(PRESET_DATA, 1, 0)
+			pgs_set_key_val(PRESET_DATA, 2, $user_sound_preset_menu_NEW)
+			pgs_set_key_val(PRESET_DATA, 4, 0)
+			pgs_set_key_val(COMMAND, 0, 1)
+
+			if (pgs_key_exists(PURGE_MODE))	
+				if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+	    			$group_count := 0
+	    		    while ($group_count < $AC_NUM_GROUPS)
+	    		        purge_group($group_count, %user_snd_preset_Ac_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $AC_NUM_GROUPS + $group_count])
+	    		        inc($group_count)
+	    		    end while
+			    	$group_count := 0
+			        while ($group_count < $EL_NUM_GROUPS)
+			            purge_group($group_count + $AC_NUM_GROUPS, %user_snd_preset_El_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $EL_NUM_GROUPS + $group_count])
+			            inc($group_count)
+			        end while
+	    		end if
+	    	end if
+		end on
+		
+		on ui_control ($sound_preset_next)
+			if($safe_flag_3 = 1)
+				$safe_flag_3 := 0
+
+				select ($Preset_Category)
+
+					case $FACTORY_PRESET_CAT_1
+						$sound_preset_next := 0
+						if ($fact_sound_preset_menu_1 + 1 <= $NUM_FACT_SOUND_PRESETS_1 - 1)
+						    inc ($fact_sound_preset_menu_1)
+						else
+						    $fact_sound_preset_menu_1 := 0
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_1
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_1)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $FACTORY_PRESET_CAT_2
+						$sound_preset_next := 0
+						if ($fact_sound_preset_menu_2 + 1 <= $NUM_FACT_SOUND_PRESETS_2 - 1 + $NUM_FACT_SOUND_PRESETS_1)
+						    inc ($fact_sound_preset_menu_2)
+						else
+						    $fact_sound_preset_menu_2 := $NUM_FACT_SOUND_PRESETS_1
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_2
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_2)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $FACTORY_PRESET_CAT_3
+						$sound_preset_next := 0
+						if ($fact_sound_preset_menu_3 + 1 <= $NUM_FACT_SOUND_PRESETS_3 - 1 + $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2)
+						    inc ($fact_sound_preset_menu_3)
+						else
+						    $fact_sound_preset_menu_3 := $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_3
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_3)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $FACTORY_PRESET_CAT_4
+						$sound_preset_next := 0
+						if ($fact_sound_preset_menu_4 + 1 <= $NUM_FACT_SOUND_PRESETS_4 - 1 + $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3)
+						    inc ($fact_sound_preset_menu_4)
+						else
+						    $fact_sound_preset_menu_4 := $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_4
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_4)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $FACTORY_PRESET_CAT_5
+						$sound_preset_next := 0
+						if ($fact_sound_preset_menu_5 + 1 <= $NUM_FACT_SOUND_PRESETS_5 - 1 + $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4)
+						    inc ($fact_sound_preset_menu_5)
+						else
+						    $fact_sound_preset_menu_5 := $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_5
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_5)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $FACTORY_PRESET_CAT_6
+						$sound_preset_next := 0
+						if ($fact_sound_preset_menu_6 + 1 <= $NUM_FACT_SOUND_PRESETS_6 - 1 + $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_5)
+						    inc ($fact_sound_preset_menu_6)
+						else
+						    $fact_sound_preset_menu_6 := $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_5
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_6
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_6)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $USER_PRESET_CAT
+						$sound_preset_next := 0
+						if ($user_sound_preset_menu + 1 <= %user_num_snd_Presets[0] - 1 + $MAX_SOUND_FACT_PRESETS)
+						    inc ($user_sound_preset_menu)
+						    $user_sound_preset_menu_NEW := $user_sound_preset_menu
+						else
+						    $user_sound_preset_menu := $MAX_SOUND_FACT_PRESETS
+						    $user_sound_preset_menu_NEW := $MAX_SOUND_FACT_PRESETS
+						end if
+						$last_sound_preset := $user_sound_preset_menu
+						pgs_set_key_val(COMMAND, 0, -1)
+						pgs_set_key_val(PRESET_DATA, 0, 1)
+						pgs_set_key_val(PRESET_DATA, 1, 0)
+						pgs_set_key_val(PRESET_DATA, 2, $user_sound_preset_menu)
+						pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+				end select
+
+				$preset_change_flag := 0
+				$safe_flag_3 := 1
+			end if
+			if ($Preset_Category < 6)
+				if (pgs_key_exists(PURGE_MODE))	
+					if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+		    			$group_count := 0
+		    		    while ($group_count < $AC_NUM_GROUPS)
+		    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+		    		        inc($group_count)
+		    		    end while
+				    	$group_count := 0
+				        while ($group_count < $EL_NUM_GROUPS)
+				            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+				            inc($group_count)
+				        end while
+		    		end if
+		    	end if
+			else
+				if (pgs_key_exists(PURGE_MODE))	
+					if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+		    			$group_count := 0
+		    		    while ($group_count < $AC_NUM_GROUPS)
+		    		        purge_group($group_count, %user_snd_preset_Ac_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $AC_NUM_GROUPS + $group_count])
+		    		        inc($group_count)
+		    		    end while
+				    	$group_count := 0
+				        while ($group_count < $EL_NUM_GROUPS)
+				            purge_group($group_count + $AC_NUM_GROUPS, %user_snd_preset_El_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $EL_NUM_GROUPS + $group_count])
+				            inc($group_count)
+				        end while
+		    		end if
+		    	end if			
+			end if
+		end on
+
+		on ui_control ($sound_preset_prev)
+			if($safe_flag_3 = 1)
+				$safe_flag_3 := 0
+				
+				select ($Preset_Category)
+
+					case $FACTORY_PRESET_CAT_1
+						$sound_preset_prev := 0
+						if ($fact_sound_preset_menu_1 - 1 >= 0)
+						    dec ($fact_sound_preset_menu_1)
+						else
+							$fact_sound_preset_menu_1 := $NUM_FACT_SOUND_PRESETS_1 - 1
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_1
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_1)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $FACTORY_PRESET_CAT_2
+						$sound_preset_prev := 0
+						if ($fact_sound_preset_menu_2 - 1 >= $NUM_FACT_SOUND_PRESETS_1)
+						    dec ($fact_sound_preset_menu_2)
+						else
+							$fact_sound_preset_menu_2 := $NUM_FACT_SOUND_PRESETS_2 - 1 + $NUM_FACT_SOUND_PRESETS_1
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_2
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_2)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $FACTORY_PRESET_CAT_3
+						$sound_preset_prev := 0
+						if ($fact_sound_preset_menu_3 - 1 >= $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2)
+						    dec ($fact_sound_preset_menu_3)
+						else
+							$fact_sound_preset_menu_3 := $NUM_FACT_SOUND_PRESETS_3 - 1 + $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_3
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_3)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $FACTORY_PRESET_CAT_4
+						$sound_preset_prev := 0
+						if ($fact_sound_preset_menu_4 - 1 >= $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3)
+						    dec ($fact_sound_preset_menu_4)
+						else
+							$fact_sound_preset_menu_4 := $NUM_FACT_SOUND_PRESETS_4 - 1 + $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_4
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_4)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $FACTORY_PRESET_CAT_5
+						$sound_preset_prev := 0
+						if ($fact_sound_preset_menu_5 - 1 >= $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4)
+						    dec ($fact_sound_preset_menu_5)
+						else
+							$fact_sound_preset_menu_5 := $NUM_FACT_SOUND_PRESETS_5 - 1 + $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_5
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_5)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $FACTORY_PRESET_CAT_6
+						$sound_preset_prev := 0
+						if ($fact_sound_preset_menu_6 - 1 >= $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_5)
+						    dec ($fact_sound_preset_menu_6)
+						else
+							$fact_sound_preset_menu_6 := $NUM_FACT_SOUND_PRESETS_6 - 1 + $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_5
+						end if
+						$last_sound_preset := $fact_sound_preset_menu_6
+						pgs_set_key_val(COMMAND, 0, -1)
+							pgs_set_key_val(PRESET_DATA, 0, 1)
+							pgs_set_key_val(PRESET_DATA, 1, 0)
+							pgs_set_key_val(PRESET_DATA, 2, $fact_sound_preset_menu_6)
+							pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+					case $USER_PRESET_CAT
+						$sound_preset_prev := 0
+						if ($user_sound_preset_menu - 1 >= $MAX_SOUND_FACT_PRESETS)
+						    dec ($user_sound_preset_menu)
+						    $user_sound_preset_menu_NEW := $user_sound_preset_menu
+						else
+							$user_sound_preset_menu := %user_num_snd_Presets[0] - 1 + $MAX_SOUND_FACT_PRESETS
+							$user_sound_preset_menu_NEW := $user_sound_preset_menu
+						end if
+						$last_sound_preset := $user_sound_preset_menu
+						pgs_set_key_val(COMMAND, 0, -1)
+						pgs_set_key_val(PRESET_DATA, 0, 1)
+						pgs_set_key_val(PRESET_DATA, 1, 0)
+						pgs_set_key_val(PRESET_DATA, 2, $user_sound_preset_menu)
+						pgs_set_key_val(PRESET_DATA, 4, 0)
+						pgs_set_key_val(COMMAND, 0, 1)
+				end select
+
+				$preset_change_flag := 0
+				$safe_flag_3 := 1
+			end if
+			
+			if ($Preset_Category < 6)
+				if (pgs_key_exists(PURGE_MODE))	
+					if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+		    			$group_count := 0
+		    		    while ($group_count < $AC_NUM_GROUPS)
+		    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+		    		        inc($group_count)
+		    		    end while
+				    	$group_count := 0
+				        while ($group_count < $EL_NUM_GROUPS)
+				            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+				            inc($group_count)
+				        end while
+		    		end if
+		    	end if
+			else
+				if (pgs_key_exists(PURGE_MODE))	
+					if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+		    			$group_count := 0
+		    		    while ($group_count < $AC_NUM_GROUPS)
+		    		        purge_group($group_count, %user_snd_preset_Ac_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $AC_NUM_GROUPS + $group_count])
+		    		        inc($group_count)
+		    		    end while
+				    	$group_count := 0
+				        while ($group_count < $EL_NUM_GROUPS)
+				            purge_group($group_count + $AC_NUM_GROUPS, %user_snd_preset_El_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $EL_NUM_GROUPS + $group_count])
+				            inc($group_count)
+				        end while
+		    		end if
+		    	end if			
+			end if
+		end on
+
+	{CATEGORY MENU Callback}
+		on ui_control ($category_mnu)
+			$Preset_Category := $category_mnu
+			call update_sound_preset_menu
+			pgs_set_key_val(COMMAND, 0, -1)
+				pgs_set_key_val(PRESET_DATA, 0, 1)
+				pgs_set_key_val(PRESET_DATA, 1, 0)
+				pgs_set_key_val(PRESET_DATA, 2, $last_sound_preset)
+				pgs_set_key_val(PRESET_DATA, 4, 0)
+				pgs_set_key_val(PRESET_DATA, 5, $Preset_Category)
+			pgs_set_key_val(COMMAND, 0, 1)
+			select ($Preset_Category)
+				case 0
+					$last_sound_preset := $last_bank_1
+				case 1
+					$last_sound_preset := $last_bank_2
+				case 2
+					$last_sound_preset := $last_bank_3
+				case 3
+					$last_sound_preset := $last_bank_4
+				case 4
+					$last_sound_preset := $last_bank_5
+				case 5
+					$last_sound_preset := $last_bank_6
+				case 6
+					$last_sound_preset := $last_user_bank
+			end select
+
+			if ($Preset_Category < 6)
+				set_control_par($user_dummy_menu_id, $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+				if (pgs_key_exists(PURGE_MODE))	
+					if (pgs_get_key_val(PURGE_MODE, 0) = 1)	
+		    			$group_count := 0
+		    		    while ($group_count < $AC_NUM_GROUPS)
+		    		        purge_group($group_count, %fact_snd_preset_Ac_Group_PURGE[$last_sound_preset * $AC_NUM_GROUPS + $group_count])
+		    		        inc($group_count)
+		    		    end while
+				    	$group_count := 0
+				        while ($group_count < $EL_NUM_GROUPS)
+				            purge_group($group_count + $AC_NUM_GROUPS, %fact_snd_preset_El_Group_PURGE[$last_sound_preset * $EL_NUM_GROUPS + $group_count])
+				            inc($group_count)
+				        end while
+		    		end if
+		    	end if
+			else
+				if (pgs_key_exists(PURGE_MODE))	
+					if (pgs_get_key_val(PURGE_MODE, 0) = 1)
+						if (%user_num_snd_Presets[0] > 0)
+		    				$group_count := 0
+		    			    while ($group_count < $AC_NUM_GROUPS)
+		    			        purge_group($group_count, %user_snd_preset_Ac_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $AC_NUM_GROUPS + $group_count])
+		    			        inc($group_count)
+		    			    end while
+				    		$group_count := 0
+				    	    while ($group_count < $EL_NUM_GROUPS)
+				    	        purge_group($group_count + $AC_NUM_GROUPS, %user_snd_preset_El_Group_PURGE[($last_sound_preset - $MAX_SOUND_FACT_PRESETS) * $EL_NUM_GROUPS + $group_count])
+				    	        inc($group_count)
+				    	    end while
+						end if
+		    		end if
+		    	end if			
+			end if
+		end on
+
+on ui_control ($file_selector)
+	if ($first_time_ever_flag = 1)
+		$first_time_ever_flag := 0
+	end if
+	
+	{$first_time_ever_flag := 1}
+	
+	@file_path := fs_get_filename(%ui_id[0], 2)
+	@file_name := fs_get_filename(%ui_id[0], 0)
+	set_text($groove_display_lbl, @file_name)
+	@last_file_path := @file_path
+	
+	pgs_set_key_val(COMMAND, 0, -1)
+	pgs_set_key_val(GROOVE_ACTION, 0, 1)
+	pgs_set_key_val(GROOVE_ACTION, 1, 0)
+	pgs_set_key_val(GROOVE_ACTION, 2, 0)
+	pgs_set_key_val(GROOVE_ACTION, 3, 0)
+	pgs_set_str_key_val(GROOVE_TITLE, @file_name)
+	pgs_set_key_val(COMMAND, 0, 2)
+
+	call load_file
+
+	call process_midi_file
+end on
+
+function show_hide_file_browser
+	if ($map_to_NOTE = 1)
+		set_control_par(%ui_id[0],$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+		set_control_par($note_mapping_bg_id, $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+		$kb_count_1 := 0
+		while ($kb_count_1 < num_elements(%kb_id))
+			set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)	
+			inc($kb_count_1)
+		end while
+	else
+		set_control_par(%ui_id[0],$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+		set_control_par($note_mapping_bg_id, $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+		$kb_count_1 := 0
+		while ($kb_count_1 < num_elements(%kb_id))
+			set_control_par(%kb_id[$kb_count_1],$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)	
+			inc($kb_count_1)
+		end while
+	end if
+end function
+
+function delete_all_key_assigned_midi
+	@file_path := ""
+	@file_name := ""
+
+	$count_1 := 0
+	while ($count_1 < $MAX_NUM_PATTERNS)
+		select ($count_1)
+			case 0
+				@loaded_mf_path_01 := @file_path
+				@loaded_mf_name_01 := @file_name
+			case 1
+				@loaded_mf_path_02 := @file_path
+				@loaded_mf_name_02 := @file_name
+			case 2
+				@loaded_mf_path_03 := @file_path
+				@loaded_mf_name_03 := @file_name
+			case 3
+				@loaded_mf_path_04 := @file_path
+				@loaded_mf_name_04 := @file_name
+			case 4
+				@loaded_mf_path_05 := @file_path
+				@loaded_mf_name_05 := @file_name
+			case 5
+				@loaded_mf_path_06 := @file_path
+				@loaded_mf_name_06 := @file_name
+			case 6
+				@loaded_mf_path_07 := @file_path
+				@loaded_mf_name_07 := @file_name
+			case 7
+				@loaded_mf_path_08 := @file_path
+				@loaded_mf_name_08 := @file_name
+			case 8
+				@loaded_mf_path_09 := @file_path
+				@loaded_mf_name_09 := @file_name
+			case 9
+				@loaded_mf_path_10 := @file_path
+				@loaded_mf_name_10 := @file_name
+			case 10
+				@loaded_mf_path_11 := @file_path
+				@loaded_mf_name_11 := @file_name
+			case 11
+				@loaded_mf_path_12 := @file_path
+				@loaded_mf_name_12 := @file_name
+		end select
+		
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $count_1, 0)
+		%key_has_pattern[$count_1] := $NO
+		!mf_loaded_paths[$count_1] := ""
+		inc($count_1)
+
+	end while
+
+	pgs_set_key_val(COMMAND, 0, 2)
+end function
+
+function mf_persistance
+	select ($active_midi_track)
+		case 0
+			@loaded_mf_path_01 := @file_path
+			@loaded_mf_name_01 := @file_name
+		case 1
+			@loaded_mf_path_02 := @file_path
+			@loaded_mf_name_02 := @file_name
+		case 2
+			@loaded_mf_path_03 := @file_path
+			@loaded_mf_name_03 := @file_name
+		case 3
+			@loaded_mf_path_04 := @file_path
+			@loaded_mf_name_04 := @file_name
+		case 4
+			@loaded_mf_path_05 := @file_path
+			@loaded_mf_name_05 := @file_name
+		case 5
+			@loaded_mf_path_06 := @file_path
+			@loaded_mf_name_06 := @file_name
+		case 6
+			@loaded_mf_path_07 := @file_path
+			@loaded_mf_name_07 := @file_name
+		case 7
+			@loaded_mf_path_08 := @file_path
+			@loaded_mf_name_08 := @file_name
+		case 8
+			@loaded_mf_path_09 := @file_path
+			@loaded_mf_name_09 := @file_name
+		case 9
+			@loaded_mf_path_10 := @file_path
+			@loaded_mf_name_10 := @file_name
+		case 10
+			@loaded_mf_path_11 := @file_path
+			@loaded_mf_name_11 := @file_name
+		case 11
+			@loaded_mf_path_12 := @file_path
+			@loaded_mf_name_12 := @file_name
+	end select
+end function
+
+{GUI Keyboard Callbacks}
+	function gui_keys_coloring
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				set_control_par(%kb_coloring_id[$count_1], $CONTROL_PAR_VALUE ,1)
+			else
+				set_control_par(%kb_coloring_id[$count_1], $CONTROL_PAR_VALUE ,0)
+			end if
+			inc($count_1)
+		end while
+	end function
+
+	on ui_control ($C_1)
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 0
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+	on ui_control ($D_1)
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 2
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+	on ui_control ($E_1)
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 4
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+	on ui_control ($F_1)
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 5
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+	on ui_control ($G_1)
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 7
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+	on ui_control ($A_1)
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 9
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+	on ui_control ($B_1)
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 11
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+	on ui_control ($Cshrp_1)
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 1
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+	on ui_control ($Dshrp_1)
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 3
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+	on ui_control ($Fshrp_1)
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 6
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+	on ui_control ($Gshrp_1)
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 8
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+	on ui_control ($Ashrp_1)
+
+		$count_1 := 0
+		while ($count_1 < $MAX_NUM_PATTERNS)
+			if (%key_has_pattern[$count_1] = $YES)
+				$pattern_edit_flag := 1
+			end if
+			inc($count_1)
+		end while
+
+		$active_midi_track := 10
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $active_midi_track
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	end on
+
+on ui_control ($map_to_NOTE)
+	if (get_control_par(get_ui_id($map_to_NOTE),$CONTROL_PAR_KEY_ALT) = 1)
+		call delete_all_key_assigned_midi
+		call gui_keys_coloring
+		$map_to_NOTE := 0
+	else
+		call show_hide_file_browser
+	end if
+end on
+
+on note
+	$count_1 := 0
+	while ($count_1 < $MAX_NUM_PATTERNS)
+		if (%key_has_pattern[$count_1] = $YES)
+			$pattern_edit_flag := 1
+		end if
+		inc($count_1)
+	end while
+
+	if ($map_to_NOTE = 1 and in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH))
+		
+		$active_midi_track := $EVENT_NOTE - 12
+		
+		call mf_persistance
+
+		!mf_loaded_paths[$active_midi_track] := @file_path
+		!mf_loaded_names[$active_midi_track] := @file_name
+		%key_has_pattern[$active_midi_track] := $YES
+		
+		$last_pattern_selected := $EVENT_NOTE - 12
+		$pattern_edit_flag := 1
+
+		pgs_set_key_val(COMMAND, 0, -1)
+		pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+		pgs_set_key_val(COMMAND, 0, 2)
+
+		$map_to_NOTE := 0
+		call show_hide_file_browser
+		call gui_keys_coloring
+	else
+		if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH) {and $play_btn = 1} and $pattern_edit_flag = 1)
+			if (%key_has_pattern[$EVENT_NOTE - 12] = $YES and $last_pattern_selected # $EVENT_NOTE - 12)
+				
+				$active_midi_track := $EVENT_NOTE - 12
+				@last_file_path := !mf_loaded_paths[$active_midi_track]
+				$load_mf_id := mf_insert_file(!mf_loaded_paths[$active_midi_track], 0, 0, 0)
+				
+				while ($load_mf_id # -1)
+					wait(1)
+				end while
+
+				mf_set_export_area(@file_name, -1,-1,0,0)
+
+				$count_1 := 0
+				while ($count_1 < $MAX_NUM_PATTERNS) {color active pattern}
+					if (%key_has_pattern[$count_1] = $YES)
+						set_key_color($count_1 + 12, $KEY_COLOR_GREEN)
+					end if
+					inc($count_1)
+				end while
+				set_key_color($active_midi_track + 12, $KEY_COLOR_RED)
+
+				call visualize_MIDI
+
+				if ($quant_amount # 0)
+					call quantize
+				end if
+				
+				if ($swing_amount # 0)
+					call swing
+				end if
+				 
+				if ($normal_btn = 0)
+					call change_length
+				end if
+				
+				if ($velocity_sld # 0)
+					call velocity
+				end if
+
+				pgs_set_key_val(COMMAND, 0, -1)
+				pgs_set_str_key_val(GROOVE_TITLE, !mf_loaded_names[$active_midi_track])
+				@file_name := pgs_get_str_key_val(GROOVE_TITLE)
+				set_text($groove_display_lbl, @file_name)
+
+				call visualize_MIDI
+
+				$last_pattern_selected := $EVENT_NOTE - 12
+
+			end if
+		end if
+	end if
+
+	if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH) and get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) = -1)
+		$play_btn := 1
+		$playing_flag := 1
+		inc($key_counter)
+	end if
+end on
+
+on release
+	if (in_range($EVENT_NOTE,$MIDI_PTTRN_LOW,$MIDI_PTTRN_HIGH) and get_event_par($EVENT_ID, $EVENT_PAR_SOURCE) = -1)
+		dec($key_counter)
+	end if
+	if (($NI_TRANSPORT_RUNNING = 0 and $playing_flag = 1) or $key_counter < 1)
+		$play_btn := 0
+	else
+		$playing_flag := 0
+	end if
+end on
+
+on listener
+	$cur_listener_id := $NI_CALLBACK_ID
+	if ($midi_init = 1)
+		call process_midi_file
+		call visualize_MIDI
+		call update_sound_preset_menu
+		call gui_keys_coloring
+		pgs_set_key_val(COMMAND, 0, -1)
+			pgs_set_key_val(GROOVE_ACTION, 1, 0)
+			pgs_set_key_val(GROOVE_ACTION, 2, 0)
+			pgs_set_key_val(GROOVE_ACTION, 3, 1)
+			pgs_set_str_key_val(GROOVE_TITLE, @file_name)
+			@file_name := pgs_get_str_key_val(GROOVE_TITLE)
+			pgs_set_key_val(LOADED_MIDI, $active_midi_track, 1)
+			set_text($groove_display_lbl, @file_name)
+		pgs_set_key_val(COMMAND, 0, 2)
+		$stretch_amt := 2
+		$visual_stretch := 1
+		$midi_init := 0
+	end if
+	if ($play_btn = 1)
+
+		if ($play_flag = 1)
+			wait(1)
+		end if
+		
+		$play_flag := 1
+		{if the clock is not running, emulate it}
+		if ($NI_TRANSPORT_RUNNING = 0)
+			$cur_song_pos := $cur_song_pos + $LISTENER_BEAT_LENGTH_TICKS
+		else
+			$cur_song_pos := $NI_SONG_POSITION
+		end if
+		
+		set_control_par($cursor_id, $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+		select ($stretch_amt)
+			case 4 	{half}
+				set_control_par($cursor_id, $CONTROL_PAR_POS_X, 25 + %half_vis_cursor_pos[($cur_song_pos / 2 mod $MF_LENGTH * 2) * 3 / 40])
+			case 2 	{normal}
+				set_control_par($cursor_id, $CONTROL_PAR_POS_X, 25 + %norm_vis_cursor_pos[$cur_song_pos mod $MF_LENGTH * 3 / 40])
+			case 1 	{double}
+				set_control_par($cursor_id, $CONTROL_PAR_POS_X, 25 + %double_vis_cursor_pos[$cur_song_pos mod $MF_LENGTH * 3 / 40])
+		end select
+		
+		$prev_ext_song_pos := $NI_SONG_POSITION
+		
+		$beat_start_time := $ENGINE_UPTIME
+		mf_get_next_at(0, $cur_song_pos mod $mf_tmp_length)
+		
+		$start_of_beat := $cur_song_pos mod $mf_tmp_length
+		$end_of_beat := $cur_song_pos mod $mf_tmp_length + $LISTENER_BEAT_LENGTH_TICKS
+		
+		while (mf_get_pos() < $end_of_beat and $play_btn = 1 and $cur_listener_id = $NI_CALLBACK_ID)
+			$diff := ticks_to_ms(mf_get_pos() - $start_of_beat) - ($ENGINE_UPTIME - $beat_start_time) * 1000
+			
+			if ($diff > 0)
+				wait($diff)
+			end if
+			
+			if (mf_get_command() = $MIDI_COMMAND_NOTE_ON)
+				play_note(mf_get_byte_one(),mf_get_byte_two(),0,ticks_to_ms(mf_get_note_length()))
+			end if
+			
+			mf_get_next(0)
+			
+			if (mf_get_command() = 0)
+				if ($end_of_beat > $mf_tmp_length)
+					mf_get_first(0)
+					$end_of_beat := $end_of_beat mod $mf_tmp_length
+					$start_of_beat := $end_of_beat - $LISTENER_BEAT_LENGTH_TICKS
+				else
+					exit
+				end if
+			end if
+		end while
+	end if
+	$play_flag := 0
+end on
+
+on async_complete
+	if ($load_mf_id = $NI_ASYNC_ID)
+		$load_mf_id := -1
+	end if
+	if ($NI_ASYNC_ID = $sound_preset_load_id_1)
+		$sound_preset_load_id_1 := -1
+	end if
+	if ($NI_ASYNC_ID = $sound_preset_load_id_2)
+		$sound_preset_load_id_2 := -1
+	end if
+	if ($NI_ASYNC_ID = $sound_preset_load_id_3)
+		$sound_preset_load_id_3 := -1
+	end if
+	if ($NI_ASYNC_ID = $sound_preset_load_id_4)
+		$sound_preset_load_id_4 := -1
+	end if
+	if ($NI_ASYNC_ID = %load_check_id[00])
+		if($NI_ASYNC_EXIT_STATUS # 1)
+			%user_num_snd_Presets[0] := 0
+
+			$arr_count_1 := 0
+			while($arr_count_1 < $NUM_USER_SOUND_PRESETS)
+				set_menu_item_visibility(%sound_preset_controls[06], $arr_count_1, 0)
+				set_menu_item_visibility($user_dummy_menu_id, $arr_count_1, 0)
+				inc($arr_count_1)
+			end while
+			
+			set_control_par(%sound_preset_controls[06], $CONTROL_PAR_HIDE,	$HIDE_WHOLE_CONTROL)
+			set_control_par($user_dummy_menu_id,		$CONTROL_PAR_HIDE,	$HIDE_PART_NOTHING)
+		end if
+	end if
+	if ($NI_ASYNC_ID = %load_check_id[01])
+		if($NI_ASYNC_EXIT_STATUS # 1)
+			while($init_flag = 1)
+				wait(75)
+			end while
+		end if
+	end if
+	if ($NI_ASYNC_ID = %load_check_id[02])
+		if($NI_ASYNC_EXIT_STATUS # 1)
+			while($init_flag = 1)
+				wait(75)
+			end while
+		end if
+	end if
+	if ($NI_ASYNC_ID = %load_check_id[03])
+		if($NI_ASYNC_EXIT_STATUS # 1)
+			while($init_flag = 1)
+				wait(75)
+			end while
+		end if
+	end if
+end on
+
+on pgs_changed
+	select (pgs_get_key_val(COMMAND, 0))
+		case 0
+			if (pgs_key_exists(AC_LOAD_PURGE_STATE))
+				$count_1 := 0
+				while ($count_1 < $AC_NUM_GROUPS)
+					%Ac_Group_PURGE_State[$count_1] := pgs_get_key_val(AC_LOAD_PURGE_STATE, $count_1)
+					inc($count_1)
+				end while
+			end if
+			if (pgs_key_exists(EL_LOAD_PURGE_STATE))
+				$count_1 := 0
+				while ($count_1 < $EL_NUM_GROUPS)
+					%El_Group_PURGE_State[$count_1] := pgs_get_key_val(EL_LOAD_PURGE_STATE, $count_1)
+					inc($count_1)
+				end while
+			end if
+
+		case $SOUND
+			if (pgs_get_key_val(PRESET_DATA, 4) = 1) {update because of save |OR| delete}
+				$sound_preset_load_id_1 := load_array(%user_num_snd_Presets,1)
+				$sound_preset_load_id_2 := load_array(!user_sound_preset_names,1)
+				$sound_preset_load_id_3 := load_array(%user_snd_preset_Ac_Group_PURGE,1)
+				$sound_preset_load_id_4 := load_array(%user_snd_preset_El_Group_PURGE,1)
+
+				while ($sound_preset_load_id_1 # -1 or $sound_preset_load_id_2 # -1 or $sound_preset_load_id_3 # -1 or $sound_preset_load_id_4 # -1)
+					wait(10)
+				end while
+				
+				if(%user_num_snd_Presets[0] = 0)
+					$user_sound_preset_menu := $MAX_SOUND_FACT_PRESETS
+					$user_sound_preset_menu_NEW := $user_sound_preset_menu
+					set_control_par(%sound_preset_controls[06],$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+					set_control_par($user_dummy_menu_id,$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+					set_menu_item_str(%sound_preset_controls[06], 0, "")
+					set_menu_item_str($user_dummy_menu_id, 0, "")
+					call update_sound_preset_menu
+				else
+					set_control_par(%sound_preset_controls[06],$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+					set_control_par($user_dummy_menu_id,$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+					$arr_count_3 := 0
+					while($arr_count_3 < $NUM_USER_SOUND_PRESETS)
+						if ($arr_count_3 < %user_num_snd_Presets[0])
+							set_menu_item_visibility(%sound_preset_controls[06], $arr_count_3, 1)
+							set_menu_item_visibility($user_dummy_menu_id, $arr_count_3, 1)
+							set_menu_item_str(%sound_preset_controls[06], $arr_count_3, !user_sound_preset_names[$arr_count_3])
+							set_menu_item_str($user_dummy_menu_id, $arr_count_3, !user_sound_preset_names[$arr_count_3])
+						else
+							set_menu_item_visibility(%sound_preset_controls[06], $arr_count_3, 0)
+							set_menu_item_visibility($user_dummy_menu_id, $arr_count_3, 0)
+						end if
+						inc($arr_count_3)
+					end while
+				end if
+				call update_sound_preset_menu
+			end if
+			if (pgs_get_key_val(PRESET_DATA, 2) # -1) {*** call update menu here}
+				$preset_helper := pgs_get_key_val(PRESET_DATA, 2)
+				
+				select ($preset_helper)
+					case 0 to $NUM_FACT_SOUND_PRESETS_1 - 1
+						$fact_sound_preset_menu_1 := $preset_helper
+						$last_sound_preset := $fact_sound_preset_menu_1
+						$last_bank_1 := $fact_sound_preset_menu_1
+					case $NUM_FACT_SOUND_PRESETS_1 to $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 - 1
+						$fact_sound_preset_menu_2 := $preset_helper
+						$last_sound_preset := $fact_sound_preset_menu_2
+						$last_bank_2 := $fact_sound_preset_menu_2
+					case $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 to $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 - 1
+						$fact_sound_preset_menu_3 := $preset_helper
+						$last_sound_preset := $fact_sound_preset_menu_3
+						$last_bank_3 := $fact_sound_preset_menu_3
+					case $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 to $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4 - 1
+						$fact_sound_preset_menu_4 := $preset_helper
+						$last_sound_preset := $fact_sound_preset_menu_4
+						$last_bank_4 := $fact_sound_preset_menu_4
+					case $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4 to $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_5 - 1
+						$fact_sound_preset_menu_5 := $preset_helper
+						$last_sound_preset := $fact_sound_preset_menu_5
+						$last_bank_5 := $fact_sound_preset_menu_5
+					case $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_5 to $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_5 + $NUM_FACT_SOUND_PRESETS_6 - 1
+						$fact_sound_preset_menu_6 := $preset_helper
+						$last_sound_preset := $fact_sound_preset_menu_6
+						$last_bank_6 := $fact_sound_preset_menu_6
+					case $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_5 + $NUM_FACT_SOUND_PRESETS_6 to $NUM_FACT_SOUND_PRESETS_1 + $NUM_FACT_SOUND_PRESETS_2 + $NUM_FACT_SOUND_PRESETS_3 + $NUM_FACT_SOUND_PRESETS_4 + $NUM_FACT_SOUND_PRESETS_5 + $NUM_FACT_SOUND_PRESETS_6 + $NUM_USER_SOUND_PRESETS
+						$user_sound_preset_menu := $preset_helper
+						$last_sound_preset := $user_sound_preset_menu
+						$user_sound_preset_menu_NEW := $user_sound_preset_menu
+						$last_user_bank := $user_sound_preset_menu
+				end select
+				$Preset_Category := pgs_get_key_val(PRESET_DATA, 5)
+				$category_mnu := $Preset_Category 
+				set_control_par(%category_controls_id[01],$CONTROL_PAR_PICTURE_STATE,$category_mnu)
+				call update_sound_preset_menu
+			end if
+		case $GROOVE
+			if (pgs_get_key_val(GROOVE_ACTION, 1) = 1)
+				if ($processing_flag # 1)
+					fs_navigate(%ui_id[0], 0)
+					set_text($play_btn, "")
+				end if
+			end if
+			if (pgs_get_key_val(GROOVE_ACTION, 2) = 1)
+				if ($processing_flag # 1)
+					fs_navigate(%ui_id[0], 1)
+					set_text($play_btn, "")
+				end if
+			end if
+			if (pgs_get_key_val(GROOVE_ACTION, 3) = 1)
+				set_text($groove_display_lbl, @file_name)
+			
+				pgs_set_key_val(COMMAND, 0, -1)
+				pgs_set_key_val(GROOVE_ACTION, 1, 0)
+				pgs_set_key_val(GROOVE_ACTION, 2, 0)
+				pgs_set_key_val(GROOVE_ACTION, 3, 0)
+				pgs_set_str_key_val(GROOVE_TITLE, @file_name)
+				pgs_set_key_val(COMMAND, 0, 2)
+				
+				call process_midi_file
+				call visualize_MIDI
+				set_text($play_btn, "")
+				$init_flag := 0
+			end if
+			if (pgs_get_key_val(GROOVE_ACTION, 0) # -1)
+				$play_btn := pgs_get_key_val(GROOVE_ACTION, 0)
+				$key_counter := $play_btn
+				if ($play_btn = 0)
+					note_off($ALL_EVENTS)
+				else
+					if ($prev_ext_song_pos = $NI_SONG_POSITION)
+						$cur_song_pos := - $LISTENER_BEAT_LENGTH_TICKS
+					else
+						$cur_song_pos := $NI_SONG_POSITION
+					end if
+				end if
+			end if
+		case $MAPPING
+			$count_1 := 0
+			while ($count_1 < 128)
+				%inverse_mapping_data[$count_1] := pgs_get_key_val(MAPPING, $count_1)
+				inc($count_1)
+			end while
+	
+			call process_midi_file
+
+	end select
+end on
