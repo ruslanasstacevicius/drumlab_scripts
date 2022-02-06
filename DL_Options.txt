@@ -910,7 +910,7 @@ on init
 	{/Control Group "Velocity"}
 
 {Control Group "Mapping"}
-	declare const $NUM_FACTORY_PRESETS := 10
+	declare const $NUM_FACTORY_PRESETS := 11
 	declare const $MAX_NUM_USER_PRESETS := 100
 
 	declare %FACTORY_MAPPING[$NUM_FACTORY_PRESETS * 128] := (-1)
@@ -2096,6 +2096,67 @@ on init
 		%FACTORY_MAPPING[$count_1 * 128 + 	123	] := 	114
 		%FACTORY_MAPPING[$count_1 * 128 + 	124	] := 	115
 		%FACTORY_MAPPING[$count_1 * 128 + 	125	] := 	121
+
+	{Studio Drummer Mapping}
+		$count_1 := 10
+		%FACTORY_MAPPING[$count_1 * 128 + 22] := 78		{CHOKE 1-5}
+		%FACTORY_MAPPING[$count_1 * 128 + 23] := 88
+		%FACTORY_MAPPING[$count_1 * 128 + 24] := 83
+		%FACTORY_MAPPING[$count_1 * 128 + 25] := 78
+		
+
+		%FACTORY_MAPPING[$count_1 * 128 + 27] := 121 	{* Perc E}
+		%FACTORY_MAPPING[$count_1 * 128 + 28] := 122 	{* Perc E}
+
+		%FACTORY_MAPPING[$count_1 * 128 + 29] := 107 	{* Perc A}
+		%FACTORY_MAPPING[$count_1 * 128 + 30] := 108 	{* Perc A}
+
+		%FACTORY_MAPPING[$count_1 * 128 + 31] := 111 	{* Perc B}
+		%FACTORY_MAPPING[$count_1 * 128 + 32] := 112 	{* Perc B}
+
+		%FACTORY_MAPPING[$count_1 * 128 + 33] := 115 	{* Perc C}
+		%FACTORY_MAPPING[$count_1 * 128 + 34] := 116 	{* Perc C}
+
+		%FACTORY_MAPPING[$count_1 * 128 + 35] := 118 	{* Perc D}
+		%FACTORY_MAPPING[$count_1 * 128 + 36] := 0 		{kick}
+		%FACTORY_MAPPING[$count_1 * 128 + 37] := 11 	{snare sidestick}
+		%FACTORY_MAPPING[$count_1 * 128 + 38] := 4 		{snare center}
+		%FACTORY_MAPPING[$count_1 * 128 + 39] := 10 	{snare rimshot}
+		%FACTORY_MAPPING[$count_1 * 128 + 40] := 7 		{snare halway}
+		%FACTORY_MAPPING[$count_1 * 128 + 41] := 54 	{TOM 3}
+		%FACTORY_MAPPING[$count_1 * 128 + 42] := 23 	{hihat}
+		%FACTORY_MAPPING[$count_1 * 128 + 43] := 54 	{TOM 3}
+		%FACTORY_MAPPING[$count_1 * 128 + 44] := 29 	{hihat}
+		%FACTORY_MAPPING[$count_1 * 128 + 45] := 47 	{TOM 2}
+		%FACTORY_MAPPING[$count_1 * 128 + 46] := 31 	{hihat controller}
+		%FACTORY_MAPPING[$count_1 * 128 + 47] := 40 	{TOM 1}
+		%FACTORY_MAPPING[$count_1 * 128 + 48] := 75 	{Crash 1 - High TIP}
+		%FACTORY_MAPPING[$count_1 * 128 + 49] := 76 	{Crash 1 - High EDGE}
+		%FACTORY_MAPPING[$count_1 * 128 + 50] := 75 	{Crash 1 - High TIP}
+		%FACTORY_MAPPING[$count_1 * 128 + 51] := 86 	{Crash 3 RIDE TIP}
+		%FACTORY_MAPPING[$count_1 * 128 + 52] := 86 	{Crash 3 RIDE TIP}
+		%FACTORY_MAPPING[$count_1 * 128 + 53] := 85 	{Crash 3 RIDE BELL}
+		%FACTORY_MAPPING[$count_1 * 128 + 54] := 80 	{Crash 2 - Low TIP}
+		%FACTORY_MAPPING[$count_1 * 128 + 55] := 81 	{Crash 2 - Low EDGE}
+		%FACTORY_MAPPING[$count_1 * 128 + 56] := 80 	{Crash 2 - Low TIP}
+		%FACTORY_MAPPING[$count_1 * 128 + 57] := 81 	{Crash 2 - Low EDGE}
+		%FACTORY_MAPPING[$count_1 * 128 + 58] := 80 	{Crash 2 - Low TIP}
+		%FACTORY_MAPPING[$count_1 * 128 + 59] := 81 	{Crash 2 - Low EDGE}
+		%FACTORY_MAPPING[$count_1 * 128 + 60] := 1 		{kick}
+		%FACTORY_MAPPING[$count_1 * 128 + 61] := 12 	{snare Kang}
+		%FACTORY_MAPPING[$count_1 * 128 + 62] := 13 	{snare SHOT}
+		%FACTORY_MAPPING[$count_1 * 128 + 63] := 13 	{snare SHOT}
+		%FACTORY_MAPPING[$count_1 * 128 + 64] := 14 	{Snare MUTED}
+
+		%FACTORY_MAPPING[$count_1 * 128 + 66] := 23 	{hihat Closed Tip}
+		%FACTORY_MAPPING[$count_1 * 128 + 68] := 26 	{hihat Closed Shank}
+		%FACTORY_MAPPING[$count_1 * 128 + 70] := 30 	{hihat Open Pedal}
+
+		%FACTORY_MAPPING[$count_1 * 128 + 76] := 23 	{hihat Closed Tip}
+		%FACTORY_MAPPING[$count_1 * 128 + 77] := 26 	{hihat Closed Shank}
+		%FACTORY_MAPPING[$count_1 * 128 + 78] := 33 	{hihat Open Half}
+		%FACTORY_MAPPING[$count_1 * 128 + 79] := 35 	{hihat Open Full}
+		%FACTORY_MAPPING[$count_1 * 128 + 80] := 30 	{hihat Open Pedal}
 	
 	declare !ARTICULATION_NAMES[126]
 		{Kick}
@@ -2658,7 +2719,8 @@ on init
 	add_menu_item($current_mapping_preset_mnu, "BFD", 7)
 	add_menu_item($current_mapping_preset_mnu, "iMap", 8)
 	add_menu_item($current_mapping_preset_mnu, "Addictive Drums", 9)
-	add_menu_item($current_mapping_preset_mnu, "---------", 10)
+	add_menu_item($current_mapping_preset_mnu, "Studio Drummer", 10)
+	add_menu_item($current_mapping_preset_mnu, "---------", 11)
 	
 	$count_1 := $NUM_FACTORY_PRESETS + 1
 	while ($count_1 < $NUM_FACTORY_PRESETS + $MAX_NUM_USER_PRESETS + 1)
