@@ -2312,7 +2312,7 @@ function load_file
 
 	$count_1 := 1
 	while ($count_1 > 0)
-		mf_get_first($track_idx)
+		mf_get_first($TRACK_IDX)
 		$count_1 := 0
 		while (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_MIDI_COMMAND) # 0)
 			if (mf_get_event_par($CURRENT_EVENT, $EVENT_PAR_0) # $processed_flag_value)
@@ -2320,7 +2320,7 @@ function load_file
 				mf_set_event_par($CURRENT_EVENT, $EVENT_PAR_0, $processed_flag_value)
 				inc($count_1)
 			end if
-			mf_get_next($track_idx)
+			mf_get_next($TRACK_IDX)
 			wait(1)
 		end while
 	end while
