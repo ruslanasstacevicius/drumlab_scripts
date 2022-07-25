@@ -24,9 +24,9 @@ on init
 	declare $message_time
 	declare $cur_note
 	declare $cur_velo
-	declare $new_Ac_velo
+	declare polyphonic $new_Ac_velo
 	declare $table_new_Ac_velo
-	declare $new_El_velo
+	declare polyphonic $new_El_velo
 	declare $table_new_El_velo
 	declare $active_inst
 	declare $count
